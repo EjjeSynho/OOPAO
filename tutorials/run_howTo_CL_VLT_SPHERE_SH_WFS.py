@@ -1,9 +1,15 @@
-# -*- coding: utf-8 -*-
+#%% -*- coding: utf-8 -*-
 """
 Created on Wed Oct 21 10:51:32 2020
 
 @author: cheritie
 """
+
+%reload_ext autoreload
+%autoreload 2
+
+import sys
+sys.path.insert(0, '..')
 
 import time
 
@@ -18,47 +24,82 @@ from OOPAO.Source import Source
 from OOPAO.Telescope import Telescope
 from OOPAO.calibration.compute_KL_modal_basis import compute_M2C
 from OOPAO.tools.displayTools import displayMap
-# %% -----------------------     read parameter file   ----------------------------------
+
 from parameter_files.parameterFile_VLT_SPHERE_SH_WFS import initializeParameterFile
 
+plt.ion()
 param = initializeParameterFile()
 
-# %%
-plt.ion()
+#%%
+from skimage.transform import resize
+from astropy.io import fits
+
+def binning(inp, N, regime='sum'):
+    if N == 1: return inp
+    out = np.dstack(np.split(np.dstack(np.split(inp, inp.shape[0]//N, axis=0)), inp.shape[1]//N, axis=1))
+    if regime == 'sum':
+        return out.sum(axis=(0,1)).reshape([inp.shape[0]//N, inp.shape[1]//N]).T
+    elif regime == 'max':
+        return out.max(axis=(0,1)).reshape([inp.shape[0]//N, inp.shape[1]//N]).T
+    if regime == 'mean':
+        return out.max(axis=(0,1)).reshape([inp.shape[0]//N, inp.shape[1]//N]).T / N**2
+
+root = 'C:/Users/akuznets/Projects/TipToy/data/calibrations/VLT_CALIBRATION/VLT_PUPIL/'
+pupil_path    = root + 'ALC2LyotStop_measured.fits'
+apodizer_path = root + 'APO1Apodizer_measured_All.fits'
+
+pupil    = fits.getdata(pupil_path).astype('float')
+apodizer = fits.getdata(apodizer_path).astype('float')
+
+pupil_size = 240
+
+pupil    = resize(pupil,    (pupil_size, pupil_size), anti_aliasing=False).astype(np.float32)
+apodizer = resize(apodizer, (pupil_size, pupil_size), anti_aliasing=True).astype(np.float32)
+
+#pupil    = binning(pupil, 2, 'max')
+#apodizer = binning(apodizer, 2, 'mean')
+
+pupil[np.where(pupil>0.0)]  = 1.0
+pupil[np.where(pupil==0.0)] = 0.0
 
 #%% -----------------------     TELESCOPE   ----------------------------------
-
 # create the Telescope object
-tel = Telescope(resolution          = param['resolution'],\
-                diameter            = param['diameter'],\
-                samplingTime        = param['samplingTime'],\
-                centralObstruction  = param['centralObstruction'])
+tel_vis = Telescope(resolution          = pupil.shape[0],\
+                    pupilReflectivity   = 1.0,
+                    diameter            = param['diameter'],\
+                    samplingTime        = param['samplingTime'],\
+                    centralObstruction  = param['centralObstruction'])
+
+tel_IR = Telescope(resolution          = pupil.shape[0],\
+                   pupil               = pupil, 
+                   pupilReflectivity   = apodizer,
+                   diameter            = param['diameter'],\
+                   samplingTime        = param['samplingTime'],\
+                   centralObstruction  = param['centralObstruction'])
 
 
-thickness_spider = 0.05                         # size in m
-angle            = [45,135,225,315]             # in degrees
+thickness_spider = 0.05                       # size in m
+angle            = [45,135,225,315]           # in degrees
 offset_X         = [-0.4,0.4,0.4,-0.4]        # shift offset of the spider
 offset_Y         = None
-
-tel.apply_spiders(angle, thickness_spider, offset_X = offset_X, offset_Y= offset_Y)
-    
-
+tel_vis.apply_spiders(angle, thickness_spider, offset_X = offset_X, offset_Y= offset_Y)
 
 plt.figure()
-plt.imshow(tel.pupilReflectivity)
+plt.imshow(tel_IR.pupilReflectivity)
+
 # %% -----------------------     NGS   ----------------------------------
 # create the Source object
-ngs=Source(optBand   = param['opticalBand'],\
-           magnitude = param['magnitude'])
+ngs_vis = Source(optBand   = 'R',\
+                 magnitude = param['magnitude'])
 
 # combine the NGS to the telescope using '*' operator:
-ngs*tel
+ngs_vis*tel_vis
 
-tel.computePSF(zeroPaddingFactor = 6)
-PSF_diff = tel.PSF/tel.PSF.max()
+tel_vis.computePSF(zeroPaddingFactor = 6)
+PSF_diff = tel_vis.PSF/tel_vis.PSF.max()
 N = 50
 
-fov_pix = tel.xPSF_arcsec[1]/tel.PSF.shape[0]
+fov_pix = tel_vis.xPSF_arcsec[1]/tel_vis.PSF.shape[0]
 fov = N*fov_pix
 plt.figure()
 plt.imshow(np.log10(PSF_diff[N:-N,N:-N]), extent=(-fov,fov,-fov,fov))
@@ -70,7 +111,7 @@ plt.ylabel('[Arcsec]')
 #%% -----------------------     ATMOSPHERE   ----------------------------------
 
 # create the Atmosphere object
-atm=Atmosphere(telescope     = tel,\
+atm=Atmosphere(telescope     = tel_vis,\
                r0            = param['r0'],\
                L0            = param['L0'],\
                windSpeed     = param['windSpeed'],\
@@ -78,7 +119,7 @@ atm=Atmosphere(telescope     = tel,\
                windDirection = param['windDirection'],\
                altitude      = param['altitude'],param = param)
 # initialize atmosphere
-atm.initializeAtmosphere(tel)
+atm.initializeAtmosphere(tel_vis)
 
 atm.update()
 
@@ -88,10 +129,10 @@ plt.title('OPD Turbulence [nm]')
 plt.colorbar()
 
 
-tel+atm
-tel.computePSF(8)
+tel_vis+atm
+tel_vis.computePSF(8)
 plt.figure()
-plt.imshow((np.log10(tel.PSF)),extent = [tel.xPSF_arcsec[0],tel.xPSF_arcsec[1],tel.xPSF_arcsec[0],tel.xPSF_arcsec[1]])
+plt.imshow((np.log10(tel_vis.PSF)),extent = [tel_vis.xPSF_arcsec[0],tel_vis.xPSF_arcsec[1],tel_vis.xPSF_arcsec[0],tel_vis.xPSF_arcsec[1]])
 plt.clim([-1,3])
 
 plt.xlabel('[Arcsec]')
@@ -102,7 +143,7 @@ plt.colorbar()
 # mis-registrations object
 misReg = MisRegistration(param)
 # if no coordonates specified, create a cartesian dm
-dm=DeformableMirror(telescope    = tel,\
+dm=DeformableMirror(telescope    = tel_vis,\
                     nSubap       = param['nSubaperture'],\
                     mechCoupling = param['mechanicalCoupling'],\
                     misReg       = misReg)
@@ -114,16 +155,15 @@ plt.ylabel('[m]')
 plt.title('DM Actuator Coordinates')
 
 #%% -----------------------     SH WFS   ----------------------------------
-
 # make sure tel and atm are separated to initialize the PWFS
-tel-atm
+tel_vis-atm
 
 wfs = ShackHartmann(nSubap      = param['nSubaperture'],\
-              telescope         = tel,\
+              telescope         = tel_vis,\
               lightRatio        = param['lightThreshold'],\
               is_geometric      = param['is_geometric'])
 
-tel*wfs
+tel_vis*wfs
 plt.close('all')
 
 plt.figure()
@@ -138,7 +178,7 @@ plt.title('WFS Camera Frame')
 foldername_M2C  = None  # name of the folder to save the M2C matrix, if None a default name is used 
 filename_M2C    = None  # name of the filename, if None a default name is used 
 # KL Modal basis
-M2C = compute_M2C(telescope            = tel,\
+M2C = compute_M2C(telescope            = tel_vis,\
                                   atmosphere         = atm,\
                                   deformableMirror   = dm,\
                                   param              = param,\
@@ -150,19 +190,19 @@ M2C = compute_M2C(telescope            = tel,\
 
 
 
-tel.resetOPD()
+tel_vis.resetOPD()
 # project the mode on the DM
 dm.coefs = M2C[:,:50]
 
-tel*dm
+tel_vis*dm
 #
 # show the modes projected on the dm, cropped by the pupil and normalized by their maximum value
-displayMap(tel.OPD,norma=True)
+displayMap(tel_vis.OPD,norma=True)
 plt.title('Basis projected on the DM')
 
-KL_dm = np.reshape(tel.OPD,[tel.resolution**2,tel.OPD.shape[2]])
+KL_dm = np.reshape(tel_vis.OPD,[tel_vis.resolution**2,tel_vis.OPD.shape[2]])
 
-covMat = (KL_dm.T @ KL_dm) / tel.resolution**2
+covMat = (KL_dm.T @ KL_dm) / tel_vis.resolution**2
 
 plt.figure()
 plt.imshow(covMat)
@@ -170,12 +210,12 @@ plt.title('Orthogonality')
 plt.show()
 
 plt.figure()
-plt.plot(np.round(np.std(np.squeeze(KL_dm[tel.pupilLogical,:]),axis = 0),5))
+plt.plot(np.round(np.std(np.squeeze(KL_dm[tel_vis.pupilLogical,:]),axis = 0),5))
 plt.title('KL mode normalization projected on the DM')
 plt.show()
 
 #%%
-from AO_modules.calibration.InteractionMatrix import InteractionMatrix
+from OOPAO.calibration.InteractionMatrix import InteractionMatrix
 # wfs.is_geometric = False
 
 stroke = 1e-9
@@ -184,26 +224,26 @@ param['nModes'] = 1000
 M2C_KL = np.asarray(M2C[:,:param['nModes']])
 # Modal interaction matrix
 # wfs.is_geometric = False
-# calib_KL = InteractionMatrix(  ngs            = ngs,\
-#                             atm            = atm,\
-#                             tel            = tel,\
-#                             dm             = dm,\
-#                             wfs            = wfs,\
-#                             M2C            = M2C_KL,\
-#                             stroke         = stroke,\
-#                             nMeasurements  = 200,\
-#                             noise          = 'off')
+# calib_KL = InteractionMatrix(ngs            = ngs,\
+#                              atm            = atm,\
+#                              tel            = tel,\
+#                              dm             = dm,\
+#                              wfs            = wfs,\
+#                              M2C            = M2C_KL,\
+#                              stroke         = stroke,\
+#                              nMeasurements  = 200,\
+#                              noise          = 'off')
 wfs.is_geometric = True
 
-calib_KL_geo = InteractionMatrix(  ngs            = ngs,\
-                            atm            = atm,\
-                            tel            = tel,\
-                            dm             = dm,\
-                            wfs            = wfs,\
-                            M2C            = M2C_KL,\
-                            stroke         = stroke,\
-                            nMeasurements  = 200,\
-                            noise          = 'off')
+calib_KL_geo = InteractionMatrix(ngs            = ngs_vis,\
+                                 atm            = atm,\
+                                 tel            = tel_vis,\
+                                 dm             = dm,\
+                                 wfs            = wfs,\
+                                 M2C            = M2C_KL,\
+                                 stroke         = stroke,\
+                                 nMeasurements  = 200,\
+                                 noise          = 'off')
 plt.figure()
 plt.plot(np.std(calib_KL_geo.D,axis=0))
 
@@ -212,32 +252,36 @@ plt.ylabel('WFS slopes STD')
 
 
 #%%
+%matplotlib qt
+from OOPAO.tools.displayTools import cl_plot
+
+ngs_IR = Source(optBand = 'H', magnitude = param['magnitude'])
+ngs_IR*tel_IR
+
 # These are the calibration data used to close the loop
 wfs.is_geometric = False
 
-calib_CL    = calib_KL_geo
-M2C_CL      = M2C_KL.copy()
+calib_CL = calib_KL_geo
+M2C_CL   = M2C_KL.copy()
 
-
-from AO_modules.tools.displayTools import cl_plot
-tel.resetOPD()
+tel_vis.resetOPD()
 # initialize DM commands
-dm.coefs=0
-ngs*tel*dm*wfs
-tel+atm
+dm.coefs = 0
+ngs_vis*tel_vis*dm*wfs
+tel_vis+atm
 
 # dm.coefs[100] = -1
 
-tel.computePSF(4)
+tel_vis.computePSF(4)
 plt.close('all')
 
 # combine telescope with atmosphere
-tel+atm
+tel_vis+atm
 
 # initialize DM commands
 dm.coefs=0
-ngs*tel*dm*wfs
-
+ngs_vis*tel_vis*dm*wfs
+ngs_IR*tel_IR
 
 plt.show()
 
@@ -248,9 +292,9 @@ total                   = np.zeros(param['nLoop'])
 residual                = np.zeros(param['nLoop'])
 wfsSignal               = np.arange(0,wfs.nSignal)*0
 SE_PSF = []
-LE_PSF = np.log10(tel.PSF_norma_zoom)
+LE_PSF = np.log10(tel_vis.PSF_norma_zoom)
 
-plot_obj = cl_plot(list_fig          = [atm.OPD,tel.mean_removed_OPD,wfs.cam.frame,[dm.coordinates[:,0],np.flip(dm.coordinates[:,1]),dm.coefs],[[0,0],[0,0]],np.log10(tel.PSF_norma_zoom),np.log10(tel.PSF_norma_zoom)],\
+plot_obj = cl_plot(list_fig          = [atm.OPD,tel_vis.mean_removed_OPD,wfs.cam.frame,[dm.coordinates[:,0],np.flip(dm.coordinates[:,1]),dm.coefs],[[0,0],[0,0]],np.log10(tel_vis.PSF_norma_zoom),np.log10(tel_vis.PSF_norma_zoom)],\
                    type_fig          = ['imshow','imshow','imshow','scatter','plot','imshow','imshow'],\
                    list_title        = ['Turbulence OPD','Residual OPD','WFS Detector','DM Commands',None,None,None],\
                    list_lim          = [None,None,None,None,None,[-4,0],[-4,0]],\
@@ -263,40 +307,50 @@ gainCL                  = 0.4
 wfs.cam.photonNoise     = True
 display                 = True
 
-reconstructor = M2C_CL@calib_CL.M
+reconstructor = M2C_CL @ calib_CL.M
 
 for i in range(param['nLoop']):
-    a=time.time()
+    a = time.time()
     # update phase screens => overwrite tel.OPD and consequently tel.src.phase
     atm.update()
     # save phase variance
-    total[i]=np.std(tel.OPD[np.where(tel.pupil>0)])*1e9
+    total[i]=np.std(tel_vis.OPD[np.where(tel_vis.pupil>0)])*1e9
     # save turbulent phase
-    turbPhase = tel.src.phase
+    turbPhase = tel_vis.src.phase
     # propagate to the WFS with the CL commands applied
-    tel*dm*wfs
-        
-    dm.coefs=dm.coefs-gainCL*np.matmul(reconstructor,wfsSignal)
+    tel_vis*dm*wfs
+    
+    dm.coefs = dm.coefs-gainCL*np.matmul(reconstructor,wfsSignal)
     # store the slopes after computing the commands => 2 frames delay
-    wfsSignal=wfs.signal
-    b= time.time()
+    wfsSignal = wfs.signal
+    b = time.time()
     print('Elapsed time: ' + str(b-a) +' s')
+    
     # update displays if required
-    if display==True:        
-        tel.computePSF(4)
-        if i>15:
-            SE_PSF.append(np.log10(tel.PSF_norma_zoom))
+    if display==True:
+        tel_IR.OPD = tel_vis.OPD
+        tel_IR.computePSF(4)
+
+        if i > 15:
+            SE_PSF.append(np.log10(tel_IR.PSF_norma_zoom))
             LE_PSF = np.mean(SE_PSF, axis=0)
         
-        cl_plot(list_fig   = [atm.OPD,tel.mean_removed_OPD,wfs.cam.frame,dm.coefs,[np.arange(i+1),residual[:i+1]],np.log10(tel.PSF_norma_zoom), LE_PSF],
-                               plt_obj = plot_obj)
+        cl_plot(list_fig = [atm.OPD,
+                            tel_vis.mean_removed_OPD,
+                            wfs.cam.frame,dm.coefs,
+                            [np.arange(i+1),residual[:i+1]],
+                            np.log10(tel_IR.PSF_norma_zoom),
+                            LE_PSF],
+                plt_obj = plot_obj)
         plt.pause(0.1)
-        if plot_obj.keep_going is False:
-            break
+
+        if plot_obj.keep_going is False: break
     
-    SR[i]=np.exp(-np.var(tel.src.phase[np.where(tel.pupil==1)]))
-    residual[i]=np.std(tel.OPD[np.where(tel.pupil>0)])*1e9
-    OPD=tel.OPD[np.where(tel.pupil>0)]
+    SR[i] = np.exp(-np.var(tel_vis.src.phase[np.where(tel_vis.pupil==1)]))
+    residual[i] = np.std(tel_vis.OPD[np.where(tel_vis.pupil>0)])*1e9
+    OPD = tel_vis.OPD[np.where(tel_vis.pupil>0)]
 
     print('Loop'+str(i)+'/'+str(param['nLoop'])+' Turbulence: '+str(total[i])+' -- Residual:' +str(residual[i])+ '\n')
 
+
+# %%

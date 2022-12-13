@@ -15,7 +15,6 @@ from .Source import Source
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% CLASS INITIALIZATION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 class Telescope:
-    
     def __init__(self,resolution, diameter,samplingTime=0.001,centralObstruction = 0,fov = 0,pupil=None,pupilReflectivity=1):
         """
         ************************** REQUIRED PARAMETERS **************************
@@ -100,7 +99,7 @@ class Telescope:
 #        Case where the pupil is not input: circular pupil with central obstruction    
         if pupil is None:
             D           = self.resolution+1
-            x           = np.linspace(-self.resolution/2,self.resolution/2,self.resolution)
+            x           = np.linspace(-self.resolution/2, self.resolution/2, self.resolution)
             xx,yy       = np.meshgrid(x,x)
             circle      = xx**2+yy**2
             obs         = circle>=(self.centralObstruction*D/2)**2
@@ -122,14 +121,15 @@ class Telescope:
         self.spatialFilter              = None
 
         print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% TELESCOPE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
-        print('{: ^18s}'.format('Diameter')                     + '{: ^18s}'.format(str(self.D))                                        +'{: ^18s}'.format('[m]'   ))
-        print('{: ^18s}'.format('Resolution')                   + '{: ^18s}'.format(str(self.resolution))                               +'{: ^18s}'.format('[pixels]'   ))
-        print('{: ^18s}'.format('Pixel Size')                   + '{: ^18s}'.format(str(np.round(self.pixelSize,2)))                    +'{: ^18s}'.format('[m]'   ))
-        print('{: ^18s}'.format('Surface')                      + '{: ^18s}'.format(str(np.round(self.pixelArea*self.pixelSize**2)))    +'{: ^18s}'.format('[m2]'  ))
-        print('{: ^18s}'.format('Central Obstruction')          + '{: ^18s}'.format(str(100*self.centralObstruction))                   +'{: ^18s}'.format('[% of diameter]' ))
-        print('{: ^18s}'.format('Pixels in the pupil')           + '{: ^18s}'.format(str(self.pixelArea))                                +'{: ^18s}'.format('[pixels]' ))
+        print('{: ^18s}'.format('Diameter')            + '{: ^18s}'.format(str(self.D))                                        +'{: ^18s}'.format('[m]'   ))
+        print('{: ^18s}'.format('Resolution')          + '{: ^18s}'.format(str(self.resolution))                               +'{: ^18s}'.format('[pixels]'   ))
+        print('{: ^18s}'.format('Pixel Size')          + '{: ^18s}'.format(str(np.round(self.pixelSize,2)))                    +'{: ^18s}'.format('[m]'   ))
+        print('{: ^18s}'.format('Surface')             + '{: ^18s}'.format(str(np.round(self.pixelArea*self.pixelSize**2)))    +'{: ^18s}'.format('[m2]'  ))
+        print('{: ^18s}'.format('Central Obstruction') + '{: ^18s}'.format(str(100*self.centralObstruction))                   +'{: ^18s}'.format('[% of diameter]' ))
+        print('{: ^18s}'.format('Pixels in the pupil') + '{: ^18s}'.format(str(self.pixelArea))                                +'{: ^18s}'.format('[pixels]' ))
         print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
         self.isInitialized= True
+
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PSF COMPUTATION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
 
     def computePSF(self,zeroPaddingFactor=2):
@@ -150,33 +150,31 @@ class Telescope:
                 phase = self.src.phase
                 
             # zeroPadded support for the FFT
-            supportPadded = np.zeros([N,N],dtype='complex')
+            supportPadded = np.zeros([N,N], dtype='complex')
             supportPadded [center-self.resolution//2:center+self.resolution//2,center-self.resolution//2:center+self.resolution//2] = amp_mask*self.pupil*self.pupilReflectivity*np.sqrt(self.src.fluxMap)*np.exp(1j*phase)
-            [xx,yy]                         = np.meshgrid(np.linspace(0,N-1,N),np.linspace(0,N-1,N))
-            self.phasor                     = np.exp(-(1j*np.pi*(N+1)/N)*(xx+yy))
-
-
+            [xx,yy] = np.meshgrid(np.linspace(0,N-1,N),np.linspace(0,N-1,N))
+            self.phasor = np.exp(-(1j*np.pi*(N+1)/N)*(xx+yy))
 
             # axis in arcsec
-            self.xPSF_arcsec       = [-206265*(self.src.wavelength/self.D) * (self.resolution/2), 206265*(self.src.wavelength/self.D) * (self.resolution/2)]
-            self.yPSF_arcsec       = [-206265*(self.src.wavelength/self.D) * (self.resolution/2), 206265*(self.src.wavelength/self.D) * (self.resolution/2)]
+            self.xPSF_arcsec = [-206265*(self.src.wavelength/self.D) * (self.resolution/2), 206265*(self.src.wavelength/self.D) * (self.resolution/2)]
+            self.yPSF_arcsec = [-206265*(self.src.wavelength/self.D) * (self.resolution/2), 206265*(self.src.wavelength/self.D) * (self.resolution/2)]
             
             # axis in radians
-            self.xPSF_rad   = [-(self.src.wavelength/self.D) * (self.resolution/2),(self.src.wavelength/self.D) * (self.resolution/2)]
-            self.yPSF_rad   = [-(self.src.wavelength/self.D) * (self.resolution/2),(self.src.wavelength/self.D) * (self.resolution/2)]
+            self.xPSF_rad = [-(self.src.wavelength/self.D) * (self.resolution/2), (self.src.wavelength/self.D) * (self.resolution/2)]
+            self.yPSF_rad = [-(self.src.wavelength/self.D) * (self.resolution/2), (self.src.wavelength/self.D) * (self.resolution/2)]
             
             # PSF computation
-            self.PSF        = (np.abs(np.fft.fft2(supportPadded*self.phasor)*mask/norma)**2)            
-            self.PSF_norma  = self.PSF/self.PSF.max()   
+            self.PSF       = (np.abs(np.fft.fft2(supportPadded*self.phasor)*mask/norma)**2)            
+            self.PSF_norma = self.PSF/self.PSF.max()   
             N_trunc = int(np.floor(2*N/6))
-            self.PSF_norma_zoom  = self.PSF_norma[N_trunc:-N_trunc,N_trunc:-N_trunc]
+            self.PSF_norma_zoom = self.PSF_norma[N_trunc:-N_trunc,N_trunc:-N_trunc]
 
         else:
             print('Error: no NGS associated to the Telescope. Combine a tel object with an ngs using ngs*tel')
             return -1
         
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PSF DISPLAY %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
-    def showPSF(self,zoom = 1):
+    def showPSF(self, zoom=1):
         # display the full PSF or zoom on the core of the PSF
         if hasattr(self, 'PSF'): 
             print('Displaying the PSF...')

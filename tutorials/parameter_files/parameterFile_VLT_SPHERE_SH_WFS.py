@@ -4,10 +4,12 @@ Created on Tue Oct 20 13:36:02 2020
 
 @author: cheritie
 """
+import sys
+sys.path.insert(0, '..')
 
 import numpy as np
 from os import path
-from AO_modules.tools.tools  import createFolder
+from OOPAO.tools.tools  import createFolder
 
 
 def initializeParameterFile():
