@@ -9,7 +9,7 @@ import time
 from .CalibrationVault import CalibrationVault
 
 
-def InteractionMatrix(ngs,atm,tel,dm,wfs,M2C,stroke,phaseOffset=0,nMeasurements=50,noise='off',invert=True,print_time=True):
+def InteractionMatrix(ngs, atm, tel, dm, wfs, M2C,stroke, phaseOffset=0, nMeasurements=50, noise='off', invert=True, print_time=True):
     if wfs.tag=='pyramid' and wfs.gpu_available:
         nMeasurements = 1
         print('Pyramid with GPU detected => using single mode measurement to increase speed.')
@@ -27,14 +27,15 @@ def InteractionMatrix(ngs,atm,tel,dm,wfs,M2C,stroke,phaseOffset=0,nMeasurements=
         nModes = M2C.shape[1]
     except:
         nModes = 1
+
     intMat = np.zeros([wfs.nSignal,nModes])
     nCycle = int(np.ceil(nModes/nMeasurements))
     nExtra = int(nModes%nMeasurements)
-    if nMeasurements>nModes:
-        nMeasurements = nModes
+
+    if nMeasurements > nModes: nMeasurements = nModes
     
-    if np.ndim(phaseOffset)==2:
-        if nMeasurements !=1:      
+    if np.ndim(phaseOffset) == 2:
+        if nMeasurements != 1:      
             phaseBuffer = np.tile(phaseOffset[...,None],(1,1,nMeasurements))
         else:
             phaseBuffer = phaseOffset
@@ -43,14 +44,14 @@ def InteractionMatrix(ngs,atm,tel,dm,wfs,M2C,stroke,phaseOffset=0,nMeasurements=
 
         
     for i in range(nCycle):  
-        if nModes>1:
-            if i==nCycle-1:
+        if nModes > 1:
+            if i == nCycle-1:
                 if nExtra != 0:
                     intMatCommands  = np.squeeze(M2C[:,-nExtra:])                
                     try:               
-                        phaseBuffer     = np.tile(phaseOffset[...,None],(1,1,intMatCommands.shape[-1]))
+                        phaseBuffer = np.tile(phaseOffset[...,None],(1,1,intMatCommands.shape[-1]))
                     except:
-                        phaseBuffer     = phaseOffset
+                        phaseBuffer = phaseOffset
                 else:
                     intMatCommands = np.squeeze(M2C[:,i*nMeasurements:((i+1)*nMeasurements)])
             else:
@@ -62,19 +63,20 @@ def InteractionMatrix(ngs,atm,tel,dm,wfs,M2C,stroke,phaseOffset=0,nMeasurements=
 #        push
         dm.coefs = intMatCommands*stroke
         tel*dm
-        tel.src.phase+=phaseBuffer
+        tel.src.phase += phaseBuffer
         tel*wfs
         sp = wfs.signal
             
 
 #       pull
-        dm.coefs=-intMatCommands*stroke
+        dm.coefs =- intMatCommands*stroke
         tel*dm
-        tel.src.phase+=phaseBuffer
+        tel.src.phase += phaseBuffer
         tel*wfs
         sm = wfs.signal
-        if i==nCycle-1:
-            if nExtra !=0:
+
+        if i == nCycle-1:
+            if nExtra != 0:
                 if nMeasurements==1:
                     intMat[:,i] = np.squeeze(0.5*(sp-sm)/stroke)                
                 else:
@@ -87,8 +89,6 @@ def InteractionMatrix(ngs,atm,tel,dm,wfs,M2C,stroke,phaseOffset=0,nMeasurements=
                     intMat[:,i] = np.squeeze(0.5*(sp-sm)/stroke)      
                  else:
                     intMat[:,-nMeasurements:] =  np.squeeze(0.5*(sp-sm)/stroke)
-
-
         else:
             if nMeasurements==1:
                 intMat[:,i] = np.squeeze(0.5*(sp-sm)/stroke)                
@@ -98,7 +98,7 @@ def InteractionMatrix(ngs,atm,tel,dm,wfs,M2C,stroke,phaseOffset=0,nMeasurements=
 
         if print_time:
             print(str((i+1)*nMeasurements)+'/'+str(nModes))
-            b=time.time()
+            b = time.time()
             print('Time elapsed: '+str(b-a)+' s' )
     
     out=CalibrationVault(intMat,invert=invert)
@@ -107,7 +107,6 @@ def InteractionMatrix(ngs,atm,tel,dm,wfs,M2C,stroke,phaseOffset=0,nMeasurements=
 
 
 def InteractionMatrixFromPhaseScreen(ngs,atm,tel,wfs,phasScreens,stroke,phaseOffset=0,nMeasurements=50,noise='off',invert=True,print_time=True):
-    
     #    disabled noise functionality from WFS
     if noise =='off':  
         wfs.cam.photonNoise  = 0
