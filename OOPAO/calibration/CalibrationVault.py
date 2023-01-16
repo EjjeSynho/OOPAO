@@ -16,34 +16,35 @@ class CalibrationVault():
         if print_details:
             print('Computing the SVD...')
         if invert:
-            U,s,V=np.linalg.svd(D,full_matrices=False)
-            self.s=s
-            self.S=np.diag(s)
-            self.eigenValues=s
-            self.D=U@self.S@V
+            U,s,V = np.linalg.svd(D,full_matrices=False)
+            self.s = s
+            self.S = np.diag(s)
+            self.eigenValues = s
+            self.D = U @ self.S @ V
         
-            self.U=np.transpose(U)
-            self.V=V
-            nEigenValues=len(s)-nTrunc
+            self.U = np.transpose(U)
+            self.V = V
+            nEigenValues = len(s)-nTrunc
             
-            self.iS=np.diag(1/self.eigenValues)        
-            self.M=np.transpose(self.V)@self.iS@self.U
+            self.iS = np.diag(1/self.eigenValues)        
+            self.M  = np.transpose(self.V) @ self.iS @ self.U
             
-            self.iStrunc=np.diag(1/self.eigenValues[:nEigenValues])  
-            self.Vtrunc=self.V[:nEigenValues,:]
-            self.Utrunc=self.U[:nEigenValues,:]
+            self.iStrunc = np.diag(1/self.eigenValues[:nEigenValues])  
+            self.Vtrunc  = self.V[:nEigenValues,:]
+            self.Utrunc  = self.U[:nEigenValues,:]
             
-            self.VtruncT=np.transpose(self.Vtrunc)
-            self.UtruncT=np.transpose(self.Utrunc)
+            self.VtruncT = np.transpose(self.Vtrunc)
+            self.UtruncT = np.transpose(self.Utrunc)
             
-            self.Mtrunc=self.VtruncT@self.iStrunc@self.Utrunc
-            self.Dtrunc=self.UtruncT@np.diag(self.eigenValues[:nEigenValues])@self.Vtrunc
+            self.Mtrunc = self.VtruncT @ self.iStrunc @ self.Utrunc
+            self.Dtrunc = self.UtruncT @ np.diag(self.eigenValues[:nEigenValues]) @ self.Vtrunc
             
-            self.cond=self.eigenValues[0]/self.eigenValues[(-nTrunc-1)]
+            self.cond = self.eigenValues[0] / self.eigenValues[(-nTrunc-1)]
+
             if print_details:
                 print('Done! The conditionning number is ' + str(self.cond))
+
             if display:
-                
                 plt.figure()
                 plt.subplot(1,2,1)
                 plt.imshow(self.D)
@@ -55,6 +56,7 @@ class CalibrationVault():
                 plt.plot([0,nEigenValues],[self.eigenValues[nEigenValues-1],self.eigenValues[nEigenValues-1]])
         else:                
             self.D=D
+
     @property
     def nTrunc(self):
         return self._nTrunc
@@ -64,31 +66,28 @@ class CalibrationVault():
         self._nTrunc=val
         
         nEigenValues=len(self.s)-self._nTrunc
+        self.iStrunc = np.diag(1/self.eigenValues[:nEigenValues])
         
-        self.iStrunc=np.diag(1/self.eigenValues[:nEigenValues])
+        self.Vtrunc  = self.V[:nEigenValues,:]
+        self.Utrunc  = self.U[:nEigenValues,:]
+        self.VtruncT = np.transpose(self.Vtrunc)
+        self.UtruncT = np.transpose(self.Utrunc)
         
-        self.Vtrunc=self.V[:nEigenValues,:]
-        self.Utrunc=self.U[:nEigenValues,:]
-        
-        self.VtruncT=np.transpose(self.Vtrunc)
-        self.UtruncT=np.transpose(self.Utrunc)
-        
-        self.Mtrunc=self.VtruncT@self.iStrunc@self.Utrunc
-
-        self.Dtrunc=self.UtruncT@np.diag(self.eigenValues[:nEigenValues])@self.Vtrunc
-        
-        self.cond=self.eigenValues[0]/self.eigenValues[(-self.nTrunc-1)]
+        self.Mtrunc = self.VtruncT @ self.iStrunc @ self.Utrunc
+        self.Dtrunc = self.UtruncT @ np.diag(self.eigenValues[:nEigenValues]) @ self.Vtrunc
+        self.cond   = self.eigenValues[0]/self.eigenValues[(-self.nTrunc-1)]
         
         plt.close(3456789)
         plt.figure(3456789)
         plt.subplot(1,2,1)
         plt.imshow(self.D.T)
         plt.colorbar()
-        plt.title('Cond: '+str(self.cond))
+        plt.title('Cond: ' + str(self.cond))
         
         plt.subplot(1,2,2)
         plt.loglog(self.eigenValues)
         plt.plot([0,nEigenValues],[self.eigenValues[nEigenValues-1],self.eigenValues[nEigenValues-1]])
+
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% END %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
  

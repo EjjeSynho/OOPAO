@@ -1,13 +1,6 @@
 #%% -*- coding: utf-8 -*-
-"""
-Created on Wed Oct 21 10:51:32 2020
-
-@author: cheritie
-"""
-
 %reload_ext autoreload
 %autoreload 2
-
 %matplotlib inline
 
 import sys
@@ -129,7 +122,7 @@ plt.colorbar()
 #%% -----------------------     DEFORMABLE MIRROR   ----------------------------------
 # mis-registrations object
 misReg = MisRegistration(param)
-# if no coordonates specified, create a cartesian dm
+# if no coordinates specified, create a cartesian dm
 dm = DeformableMirror(telescope    = tel_vis,\
                       nSubap       = param['nSubaperture'],\
                       mechCoupling = param['mechanicalCoupling'],\
@@ -232,7 +225,7 @@ calib_KL_geo = InteractionMatrix(ngs            = ngs_vis,
                                  nMeasurements  = 200,
                                  noise          = 'on')
 plt.figure()
-plt.plot(np.std(calib_KL_geo.D,axis=0))
+plt.plot(np.std(calib_KL_geo.D, axis=0))
 
 plt.xlabel('Mode Number')
 plt.ylabel('WFS slopes STD')
@@ -277,7 +270,7 @@ param['nLoop'] = 200
 SR        = np.zeros(param['nLoop'])
 total     = np.zeros(param['nLoop'])
 residual  = np.zeros(param['nLoop'])
-wfsSignal = np.arange(0,wfs.nSignal)*0
+wfsSignal = np.arange(0, wfs.nSignal)*0
 SE_PSF = []
 LE_PSF = np.log10(tel_vis.PSF_norma_zoom)
 
@@ -290,9 +283,9 @@ plot_obj = cl_plot(list_fig          = [atm.OPD,tel_vis.mean_removed_OPD,wfs.cam
                    list_display_axis = [None,None,None,None,True,None,None],\
                    list_ratio        = [[0.95,0.95,0.1],[1,1,1,1]], s=5)
 # loop parameters
-gainCL              = 0.4
+gainCL  = 0.4
+display = True
 wfs.cam.photonNoise = True
-display             = True
 
 reconstructor = M2C_CL @ calib_CL.M
 
@@ -307,17 +300,17 @@ for i in range(param['nLoop']):
     # propagate to the WFS with the CL commands applied
     tel_vis*dm*wfs
     
-    dm.coefs = dm.coefs - gainCL*np.matmul(reconstructor, wfsSignal)
+    dm.coefs -= gainCL * (reconstructor @ wfsSignal)
     # store the slopes after computing the commands => 2 frames delay
     wfsSignal = wfs.signal
     b = time.time()
-    print('Elapsed time: ' + str(b-a) +' s')
+    print('Elapsed time:', str(np.round((b-a)*1e3).astype('int')), 'ms')
     
     # update displays if required
-    if display==True:
-        tel_IR.OPD = tel_vis.OPD
-        tel_IR.computePSF(4)
-
+    tel_IR.OPD = tel_vis.OPD
+    tel_IR.computePSF(4)
+    
+    if display == True:
         if i > 15:
             SE_PSF.append(np.log10(tel_IR.PSF_norma_zoom))
             LE_PSF = np.mean(SE_PSF, axis=0)
@@ -337,7 +330,31 @@ for i in range(param['nLoop']):
     OPD   = tel_vis.OPD[np.where(tel_vis.pupil>0)]
     residual[i] = np.std( tel_vis.OPD[np.where(tel_vis.pupil > 0)] )*1e9
 
-    print('Loop'+str(i)+'/'+str(param['nLoop'])+' Turbulence: '+str(total[i])+' -- Residual:' +str(residual[i])+ '\n')
-
+    print('Loop '+str(i)+'/'+str(param['nLoop'])+' -- turbulence: '+str(np.round(total[i],1))+', residual: ' +str(np.round(residual[i],1))+ '\n')
 
 # %%
+
+import cupy as cp
+import time
+
+wfsSignal1 = cp.zeros_like(wfsSignal)
+reconstructor1 = cp.array(reconstructor)
+
+start_gpu = cp.cuda.Event()
+end_gpu = cp.cuda.Event()
+
+start_gpu.record()
+start_cpu = time.perf_counter()
+
+wfsSignal1 = cp.array(wfsSignal)
+A = reconstructor @ wfsSignal
+A1 = reconstructor1 @ wfsSignal1
+
+end_cpu = time.perf_counter()
+end_gpu.record()
+end_gpu.synchronize()
+
+t_gpu = cp.cuda.get_elapsed_time(start_gpu, end_gpu)
+t_cpu = end_cpu - start_cpu
+
+print(t_cpu, t_gpu/1e3)

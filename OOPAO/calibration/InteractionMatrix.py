@@ -139,11 +139,11 @@ def InteractionMatrixFromPhaseScreen(ngs,atm,tel,wfs,phasScreens,stroke,phaseOff
         if nModes>1:
             if i==nCycle-1:
                 if nExtra != 0:
-                    modes_in  = np.squeeze(phasScreens[:,:,-nExtra:])                
+                    modes_in = np.squeeze(phasScreens[:,:,-nExtra:])                
                     try:               
-                        phaseBuffer     = np.tile(phaseOffset[...,None],(1,1,modes_in.shape[-1]))
+                        phaseBuffer = np.tile(phaseOffset[...,None],(1,1,modes_in.shape[-1]))
                     except:
-                        phaseBuffer     = phaseOffset
+                        phaseBuffer = phaseOffset
                 else:
                     modes_in = np.squeeze(phasScreens[:,:,i*nMeasurements:((i+1)*nMeasurements)])
     
