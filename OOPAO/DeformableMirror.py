@@ -41,9 +41,10 @@ class DeformableMirror:
         self.print_dm_properties = print_dm_properties
         self.floating_precision = floating_precision
         self.M4_param = M4_param
+        
         if M4_param:
             if M4_param['isM4']:
-                print_('Building the set of influence functions of M4...',print_dm_properties)
+                print_('Building the set of influence functions of M4...', print_dm_properties)
                 # generate the M4 influence functions            
 
                 pup = telescope.pupil
@@ -89,12 +90,12 @@ class DeformableMirror:
                 b = time.time()
 
                 print_('Done! M4 influence functions computed in ' + str(b-a) + ' s!',print_dm_properties)
-            else:
-                self.isM4 = False
-        else:
-            self.isM4 = False
-        self.telescope             = telescope
-        self.altitude = altitude
+            else: self.isM4 = False
+        else: self.isM4  = False
+
+        self.telescope = telescope
+        self.altitude  = altitude
+
         if altitude is None:
             self.resolution            = telescope.resolution      # Resolution of the DM influence Functions 
             self.mechCoupling          = mechCoupling
@@ -114,7 +115,7 @@ class DeformableMirror:
 
         
         # case with no pitch specified (Cartesian geometry)
-        if pitch==0:
+        if pitch == 0:
             self.pitch             = self.D/(nSubap)                 # size of a subaperture
         else:
             self.pitch = pitch
@@ -128,9 +129,8 @@ class DeformableMirror:
         
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% DM INITIALIZATION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
 
-# If no coordinates are given, the DM is in a Cartesian Geometry
-        
-        if np.ndim(coordinates)==0:  
+        # If no coordinates are given, the DM is in a Cartesian Geometry
+        if np.ndim(coordinates) == 0:  
             print_('No coordinates loaded.. taking the cartesian geometry as a default',print_dm_properties)
             self.nAct                               = nSubap+1                            # In that case corresponds to the number of actuator along the diameter            
             self.nActAlongDiameter                  = self.nAct-1

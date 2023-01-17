@@ -235,7 +235,7 @@ plt.ylabel('WFS slopes STD')
 %matplotlib qt
 from OOPAO.tools.displayTools import cl_plot
 
-ngs_IR = Source(optBand = 'H', magnitude = param['magnitude'])
+ngs_IR = Source(optBand='H', magnitude=param['magnitude'])
 ngs_IR*tel_IR
 
 # These are the calibration data used to close the loop
@@ -358,3 +358,18 @@ t_gpu = cp.cuda.get_elapsed_time(start_gpu, end_gpu)
 t_cpu = end_cpu - start_cpu
 
 print(t_cpu, t_gpu/1e3)
+# %%
+
+# 4x3
+# a = np.ones([12,2,2])
+# a *= (np.arange(12)+1)[:,None,None]
+
+start_cpu = time.perf_counter()
+a = np.ones([40**2,6,6])
+a = np.vstack(np.hstack(np.stack(np.vsplit(a, 40)).transpose(1,2,3,0)).transpose(2,0,1))
+end_cpu = time.perf_counter()
+t_cpu = end_cpu - start_cpu
+
+print(a.shape, t_cpu)
+
+# %%

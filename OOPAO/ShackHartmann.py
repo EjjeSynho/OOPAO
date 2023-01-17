@@ -174,6 +174,8 @@ class ShackHartmann:
         self.index_x = np.asarray(self.index_x)
         self.index_y = np.asarray(self.index_y)
         
+        self.wfs_frame_buffer = np.zeros([self.index_x.shape[0], self.n_pix_subap, self.n_pix_subap])
+
         print('Selecting valid subapertures based on flux considerations..')
 
         self.photon_per_subaperture_2D = np.reshape(self.photon_per_subaperture,[self.nSubap,self.nSubap])
@@ -290,6 +292,7 @@ class ShackHartmann:
             self.current_nPhoton = self.telescope.src.nPhoton
         return
     
+
     def get_lenslet_em_field(self,phase):
         tmp_phase_h_split = np.hsplit(phase.T,self.nSubap)
         self.cube_em = np.zeros([self.nSubap**2, self.n_pix_lenslet_init, self.n_pix_lenslet_init], dtype=complex)
@@ -303,11 +306,14 @@ class ShackHartmann:
         self.cube_em *= np.sqrt(self.cube_flux) * self.phasor_tiled
         return self.cube_em 
   
-    def fill_camera_frame(self,ind_x,ind_y,I,index_frame=None):
+
+    def fill_camera_frame(self, ind_x=None, ind_y=None, I=None, index_frame=None):
         if index_frame is None:
-            self.camera_frame[ind_x*self.n_pix_subap//self.binning_factor:(ind_x+1)*self.n_pix_subap//self.binning_factor,ind_y*self.n_pix_subap//self.binning_factor:(ind_y+1)*self.n_pix_subap//self.binning_factor] = I        
-        else:
+            self.wfs_frame_buffer[self.valid_subapertures_1D,:,:] = self.maps_intensity
+            self.camera_frame = np.vstack(np.hstack(np.stack(np.vsplit(self.wfs_frame_buffer, self.nSubap)).transpose(1,2,3,0)).transpose(2,0,1))
+        else: #TODO: cover this case
             self.camera_frame[index_frame,ind_x*self.n_pix_subap//self.binning_factor:(ind_x+1)*self.n_pix_subap//self.binning_factor,ind_y*self.n_pix_subap//self.binning_factor:(ind_y+1)*self.n_pix_subap//self.binning_factor] = I
+
 
     def compute_camera_frame_multi(self,maps_intensity):   
         self.ind_frame =np.zeros(maps_intensity.shape[0],dtype=(int))
@@ -449,6 +455,7 @@ class ShackHartmann:
         return
     
     def wfs_measure(self,phase_in = None):
+        #start_cpu = time.perf_counter()
         if phase_in is not None:
             self.telescope.src.phase = phase_in
         
@@ -461,7 +468,7 @@ class ShackHartmann:
             if np.ndim(self.telescope.OPD)==2:
                 #-- case with a single wave-front to sense--   
                 # reset camera frame to be filled up
-                self.camera_frame   = np.zeros([self.n_pix_subap*(self.nSubap)//self.binning_factor,self.n_pix_subap*(self.nSubap)//self.binning_factor], dtype =float)
+                self.camera_frame = np.zeros([self.n_pix_subap*(self.nSubap)//self.binning_factor,self.n_pix_subap*(self.nSubap)//self.binning_factor], dtype =float)
                 # normalization for FFT
                 norma = self.cube.shape[1]
 
@@ -474,10 +481,10 @@ class ShackHartmann:
                     phase = self.telescope.phase_filtered   
                     self.initialize_flux(self.telescope.amplitude_filtered.T*self.telescope.src.fluxMap.T)
 
-                I = (np.abs(np.fft.fft2(np.asarray(self.get_lenslet_em_field(phase)),axes=[1,2])/norma)**2)
+                I = (np.abs(np.fft.fft2(np.asarray(self.get_lenslet_em_field(phase))[self.valid_subapertures_1D,:,:], axes=[1,2]) / norma)**2)
 
                 # reduce to valid subaperture
-                I = I[self.valid_subapertures_1D,:,:]
+                #I = I[self.valid_subapertures_1D,:,:]
                 
                 self.sum_I   = np.sum(I,axis=0)
                 self.edge_subaperture_criterion = np.sum(I*self.outerMask)/np.sum(I)
@@ -492,29 +499,23 @@ class ShackHartmann:
                 
                 # in case of LGS sensor, convolve with LGS spots to create spot elungation
                 if self.is_LGS:
-                    I = np.fft.fftshift(np.abs((np.fft.ifft2(np.fft.fft2(I)*self.C))),axes = [1,2])
+                    I = np.fft.fftshift(np.abs((np.fft.ifft2(np.fft.fft2(I)*self.C))), axes=[1,2])
 
                 # bin the 2D spots intensity to get the desired number of pixel per subaperture
                 self.maps_intensity =  bin_ndarray(I,[I.shape[0], self.n_pix_subap//self.binning_factor,self.n_pix_subap//self.binning_factor], operation='sum')
             
                 # add photon/readout noise to 2D spots
                 if self.cam.photonNoise != 0:
-                    self.maps_intensity  = self.random_state_photon_noise.poisson(self.maps_intensity)
+                    self.maps_intensity = self.random_state_photon_noise.poisson(self.maps_intensity)
                         
                 if self.cam.readoutNoise != 0:
                     self.maps_intensity += np.int64(np.round(self.random_state_readout_noise.randn(self.maps_intensity.shape[0],self.maps_intensity.shape[1],self.maps_intensity.shape[2])*self.cam.readoutNoise))
                 
-                a = time.time()
                 # fill camera frame with computed intensity (only valid subapertures)
-                def joblib_fill_camera_frame():
-                    Q=Parallel(n_jobs=1,prefer='processes')(delayed(self.fill_camera_frame)(i,j,k) for i,j,k in zip(self.index_x[self.valid_subapertures_1D],self.index_y[self.valid_subapertures_1D],self.maps_intensity))
-                    return Q
-                joblib_fill_camera_frame()
-                b = time.time()
-                print('AAAAAA', (b-a)*1e3)
-
+                self.fill_camera_frame()
+                
                 # compute the centroid on valid subaperture
-                self.centroid_lenslets = self.centroid(self.maps_intensity,self.threshold_cog)
+                self.centroid_lenslets = self.centroid(self.maps_intensity, self.threshold_cog)
                 
                 # discard nan and inf values
                 val_inf = np.where(np.isinf(self.centroid_lenslets))
@@ -529,13 +530,13 @@ class ShackHartmann:
                     self.centroid_lenslets[np.where(np.isnan(self.centroid_lenslets))] = 0
                     
                 # compute slopes-maps
-                self.SX[self.validLenslets_x,self.validLenslets_y] = self.centroid_lenslets[:,0]
-                self.SY[self.validLenslets_x,self.validLenslets_y] = self.centroid_lenslets[:,1]
+                self.SX[self.validLenslets_x, self.validLenslets_y] = self.centroid_lenslets[:,0]
+                self.SY[self.validLenslets_x, self.validLenslets_y] = self.centroid_lenslets[:,1]
                 
-                signal_2D                           = np.concatenate((self.SX,self.SY)) - self.reference_slopes_maps
-                signal_2D[~self.valid_slopes_maps]  = 0
-                self.signal_2D                      = signal_2D/self.slopes_units
-                self.signal                         = self.signal_2D[self.valid_slopes_maps]
+                signal_2D                          = np.concatenate((self.SX,self.SY)) - self.reference_slopes_maps
+                signal_2D[~self.valid_slopes_maps] = 0
+                self.signal_2D                     = signal_2D/self.slopes_units
+                self.signal                        = self.signal_2D[self.valid_slopes_maps]
 
                 # assign camera_fram to sh.cam.frame
                 self*self.cam
@@ -620,6 +621,10 @@ class ShackHartmann:
                 maps = compute_geometric_signals()
                 self.signal_2D = np.asarray(maps)/self.slopes_units
                 self.signal = self.signal_2D[:,self.valid_slopes_maps].T
+                
+        #end_cpu = time.perf_counter()
+        #t_cpu = end_cpu - start_cpu
+        #print('Time elapsed: ', t_cpu*1e3)
 
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% WFS PROPERTIES %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
@@ -674,7 +679,7 @@ class ShackHartmann:
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% WFS INTERACTIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     def __mul__(self,obj): 
-        if obj.tag=='detector':
+        if obj.tag == 'detector':
             obj.frame = self.camera_frame
         else:
             print('Error light propagated to the wrong type of object')

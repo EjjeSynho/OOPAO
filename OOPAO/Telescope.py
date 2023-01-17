@@ -15,7 +15,7 @@ from .Source import Source
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% CLASS INITIALIZATION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 class Telescope:
-    def __init__(self,resolution, diameter,samplingTime=0.001,centralObstruction = 0,fov = 0,pupil=None,pupilReflectivity=1):
+    def __init__(self, resolution, diameter, samplingTime=0.001, centralObstruction=0, fov=0, pupil=None, pupilReflectivity=1):
         """
         ************************** REQUIRED PARAMETERS **************************
         
@@ -132,15 +132,15 @@ class Telescope:
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PSF COMPUTATION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
 
-    def computePSF(self,zeroPaddingFactor=2):
-        if hasattr(self,'src'): 
+    def computePSF(self, zeroPaddingFactor=2):
+        if hasattr(self, 'src'): 
             # number of pixel considered 
-            N       = int(zeroPaddingFactor * self.resolution)        
-            center  = N//2           
-            norma   = N
+            N      = int(zeroPaddingFactor * self.resolution)        
+            center = N//2           
+            norma  = N
             
             if self.spatialFilter is not None:
-                self.spatialFilter.set_spatial_filter(zeroPaddingFactor = zeroPaddingFactor)
+                self.spatialFilter.set_spatial_filter(zeroPaddingFactor=zeroPaddingFactor)
                 mask = self.spatialFilter.mask
                 amp_mask = self.amplitude_filtered
                 phase = self.phase_filtered
@@ -167,7 +167,7 @@ class Telescope:
             self.PSF       = (np.abs(np.fft.fft2(supportPadded*self.phasor)*mask/norma)**2)            
             self.PSF_norma = self.PSF/self.PSF.max()   
             N_trunc = int(np.floor(2*N/6))
-            self.PSF_norma_zoom = self.PSF_norma[N_trunc:-N_trunc,N_trunc:-N_trunc]
+            self.PSF_norma_zoom = self.PSF_norma[N_trunc:-N_trunc, N_trunc:-N_trunc]
 
         else:
             print('Error: no NGS associated to the Telescope. Combine a tel object with an ngs using ngs*tel')
