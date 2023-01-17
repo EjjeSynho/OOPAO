@@ -26,7 +26,7 @@ def initializeParameterFile():
                
                               
     ###%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% M1 PROPERTIES %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    param['diameter'            ] = 8.2                                            # diameter in [m]
+    param['diameter'            ] = 8#.2                                            # diameter in [m]
     param['nSubaperture'        ] = 40                                             # number of PWFS subaperture along the telescope diameter
     param['nPixelPerSubap'      ] = 6                                              # sampling of the PWFS subapertures
     param['resolution'          ] = param['nSubaperture']*param['nPixelPerSubap']  # resolution of the telescope driven by the PWFS
@@ -35,11 +35,13 @@ def initializeParameterFile():
     param['centralObstruction'  ] = 0.12                                           # central obstruction in percentage of the diameter
     param['nMissingSegments'    ] = 0                                              # number of missing segments on the M1 pupil
     param['m1_reflectivity'     ] = 1                                              # reflectivity of the 798 segments
-          
+    param['pixel scale'         ] = 12.3                                           # pixel scale in [mas] 
+
     ###%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% NGS PROPERTIES %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    param['magnitude'           ] = 8                                              # magnitude of the guide star
-    param['opticalBand'         ] = 'R'                                            # optical band of the guide star
-    
+    param['magnitude WFS'       ] = 8                                              # magnitude of the guide star
+    param['magnitude science'   ] = 8                                              # magnitude of the guide star
+    param['opticalBand WFS'     ] = 'R'                                            # optical band of the guide star
+    param['opticalBand science' ] = 'H'                                            # optical band of the guide star
     
     ###%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% DM PROPERTIES %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     param['nActuator'           ] = param['nSubaperture']+1                        # number of actuators 
@@ -71,7 +73,7 @@ def initializeParameterFile():
 
     ###%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% OUTPUT DATA %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     # name of the system
-    param['name'] = 'VLT_' +  param['opticalBand'] +'_band_'+ str(param['nSubaperture'])+'x'+ str(param['nSubaperture'])  
+    param['name'] = 'VLT_' +  param['opticalBand science'] +'_band_'+ str(param['nSubaperture'])+'x'+ str(param['nSubaperture'])  
     
     ROOT = 'C:/Users/akuznets/Data/SPHERE/simulated/'
 

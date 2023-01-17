@@ -172,6 +172,55 @@ class Telescope:
         else:
             print('Error: no NGS associated to the Telescope. Combine a tel object with an ngs using ngs*tel')
             return -1
+
+
+    def computePSFbatch(self, EMF_stack, img_size, zeroPaddingFactor=2):
+        if hasattr(self, 'src'): 
+            # number of pixel considered 
+            resolution = EMF_stack.shape[0]
+            # N          = int(zeroPaddingFactor*resolution)        
+            # center     = N//2
+            
+            # # zeroPadded support for the FFT
+            # supportPadded = np.zeros([N,N,EMF_stack.shape[2]], dtype='complex')
+            # supportPadded [center-resolution//2:center+resolution//2, center-resolution//2:center+resolution//2, :] = EMF_stack
+            # [xx,yy] = np.meshgrid(np.linspace(0,N-1,N), np.linspace(0,N-1,N))
+            # self.phasor = np.exp(-(1j*np.pi*(N+1)/N)*(xx+yy))
+
+            # # PSF computation
+            # return np.abs(np.fft.fft2(supportPadded*np.atleast_3d(self.phasor), axes=(0,1))/N)**2      
+
+            N = np.fix(zeroPaddingFactor * resolution).astype('int')
+            pad_width = np.ceil((N-resolution)/2).astype('int')
+
+            supportPadded = np.zeros([resolution+2*pad_width, resolution+2*pad_width, EMF_stack.shape[2]], dtype=np.complex64)
+            supportPadded[pad_width:pad_width+resolution, pad_width:pad_width+resolution,:] = EMF_stack
+            N = supportPadded.shape[0] # make sure the number of pxels is correct after the padding
+
+            # PSF computation
+            [xx,yy] = np.meshgrid( np.linspace(0,N-1,N), np.linspace(0,N-1,N), copy=False )    
+            center_aligner = np.atleast_3d( np.exp(-1j*np.pi/N * (xx+yy) * (1-img_size%2)).astype(np.complex64) )
+            #                                                                     ^--- this is to account odd/even number of pixels
+            # Propagate with Fourier shifting
+            EMF = np.fft.fftshift(1/N * np.fft.fft2(np.fft.ifftshift(supportPadded*center_aligner), axes=(0,1)))
+
+            # Again, this is to properly crop a PSF with the odd/even number of pixels
+            if N % 2 == img_size % 2:
+                shift_pix = 0
+            else:
+                if N % 2 == 0: shift_pix = 1
+                else: shift_pix = -1
+
+            # Support only rectangular PSFs
+            ids = np.array([np.ceil(N/2) - img_size//2+(1-N%2)-1, np.ceil(N/2) + img_size//2+shift_pix]).astype(np.int32)
+            EMF = EMF[ids[0]:ids[1], ids[0]:ids[1], :]
+
+            return np.abs(EMF)**2
+
+        else:
+            print('Error: no NGS associated to the Telescope. Combine a tel object with an ngs using ngs*tel')
+            return -1
+
         
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PSF DISPLAY %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
     def showPSF(self, zoom=1):

@@ -68,20 +68,28 @@ tel_vis.apply_spiders(angle, thickness_spider, offset_X = offset_X, offset_Y= of
 plt.figure()
 plt.imshow(tel_IR.pupilReflectivity)
 
-# %% -----------------------     NGS   ----------------------------------
+# % -----------------------     NGS   ----------------------------------
 # create the Source object
-ngs_vis = Source(optBand   = 'R',\
-                 magnitude = param['magnitude'])
+
+rad2mas  = 3600 * 180 * 1000 / np.pi
+
+ngs_vis = Source(optBand=param['opticalBand WFS'],     magnitude=param['magnitude WFS'])
+ngs_IR  = Source(optBand=param['opticalBand science'], magnitude=param['magnitude science'])
+
+pixels_per_l_D_IR  = ngs_IR.wavelength*rad2mas  / param['pixel scale'] / param['diameter']
+pixels_per_l_D_vis = ngs_vis.wavelength*rad2mas / param['pixel scale'] / param['diameter']
 
 # combine the NGS to the telescope using '*' operator:
 ngs_vis*tel_vis
+ngs_IR*tel_IR
 
-tel_vis.computePSF(zeroPaddingFactor = 6)
+tel_vis.computePSF(zeroPaddingFactor=pixels_per_l_D_vis)
 PSF_diff = tel_vis.PSF/tel_vis.PSF.max()
 N = 50
 
 fov_pix = tel_vis.xPSF_arcsec[1]/tel_vis.PSF.shape[0]
 fov = N*fov_pix
+
 plt.figure()
 plt.imshow(np.log10(PSF_diff[N:-N,N:-N]), extent=(-fov,fov,-fov,fov))
 plt.clim([-4.5,0])
@@ -110,9 +118,9 @@ plt.colorbar()
 
 
 tel_vis+atm
-tel_vis.computePSF(8)
+tel_vis.computePSF(4)
 plt.figure()
-plt.imshow((np.log10(tel_vis.PSF)), extent = [tel_vis.xPSF_arcsec[0],tel_vis.xPSF_arcsec[1],tel_vis.xPSF_arcsec[0],tel_vis.xPSF_arcsec[1]])
+plt.imshow((np.log10(tel_vis.PSF)), extent=[tel_vis.xPSF_arcsec[0], tel_vis.xPSF_arcsec[1], tel_vis.xPSF_arcsec[0], tel_vis.xPSF_arcsec[1]])
 plt.clim([-1,3])
 
 plt.xlabel('[Arcsec]')
@@ -123,9 +131,9 @@ plt.colorbar()
 # mis-registrations object
 misReg = MisRegistration(param)
 # if no coordinates specified, create a cartesian dm
-dm = DeformableMirror(telescope    = tel_vis,\
-                      nSubap       = param['nSubaperture'],\
-                      mechCoupling = param['mechanicalCoupling'],\
+dm = DeformableMirror(telescope    = tel_vis,
+                      nSubap       = param['nSubaperture'],
+                      mechCoupling = param['mechanicalCoupling'],
                       misReg       = misReg)
 
 plt.figure()
@@ -138,9 +146,9 @@ plt.title('DM Actuator Coordinates')
 # make sure tel and atm are separated to initialize the PWFS
 tel_vis-atm
 
-wfs = ShackHartmann(nSubap       = param['nSubaperture'],\
-                    telescope    = tel_vis,\
-                    lightRatio   = param['lightThreshold'],\
+wfs = ShackHartmann(nSubap       = param['nSubaperture'],
+                    telescope    = tel_vis,
+                    lightRatio   = param['lightThreshold'],
                     is_geometric = param['is_geometric'])
 tel_vis*wfs
 plt.close('all')
@@ -181,7 +189,7 @@ tel_vis*dm
 displayMap(tel_vis.OPD,norma=True)
 plt.title('Basis projected on the DM')
 
-KL_dm = np.reshape(tel_vis.OPD,[tel_vis.resolution**2,tel_vis.OPD.shape[2]])
+KL_dm = np.reshape(tel_vis.OPD, [tel_vis.resolution**2, tel_vis.OPD.shape[2]])
 
 covMat = (KL_dm.T @ KL_dm) / tel_vis.resolution**2
 
@@ -205,25 +213,25 @@ param['nModes'] = 1000
 M2C_KL = np.asarray(M2C[:,:param['nModes']])
 # Modal interaction matrix
 
-# calib_KL = InteractionMatrix(ngs            = ngs,\
-#                              atm            = atm,\
-#                              tel            = tel,\
-#                              dm             = dm,\
-#                              wfs            = wfs,\
-#                              M2C            = M2C_KL,\
-#                              stroke         = stroke,\
-#                              nMeasurements  = 200,\
-#                              noise          = 'off')
+# calib_KL = InteractionMatrix(ngs           = ngs,\
+#                              atm           = atm,\
+#                              tel           = tel,\
+#                              dm            = dm,\
+#                              wfs           = wfs,\
+#                              M2C           = M2C_KL,\
+#                              stroke        = stroke,\
+#                              nMeasurements = 200,\
+#                              noise         = 'off')
 
-calib_KL_geo = InteractionMatrix(ngs            = ngs_vis,
-                                 atm            = atm,
-                                 tel            = tel_vis,
-                                 dm             = dm,
-                                 wfs            = wfs,
-                                 M2C            = M2C_KL,
-                                 stroke         = stroke,
-                                 nMeasurements  = 200,
-                                 noise          = 'on')
+calib_KL_geo = InteractionMatrix(ngs           = ngs_vis,
+                                 atm           = atm,
+                                 tel           = tel_vis,
+                                 dm            = dm,
+                                 wfs           = wfs,
+                                 M2C           = M2C_KL,
+                                 stroke        = stroke,
+                                 nMeasurements = 200,
+                                 noise         = 'on')
 plt.figure()
 plt.plot(np.std(calib_KL_geo.D, axis=0))
 
@@ -234,9 +242,6 @@ plt.ylabel('WFS slopes STD')
 #%%
 %matplotlib qt
 from OOPAO.tools.displayTools import cl_plot
-
-ngs_IR = Source(optBand='H', magnitude=param['magnitude'])
-ngs_IR*tel_IR
 
 # These are the calibration data used to close the loop
 wfs.is_geometric = param['is_geometric']
@@ -265,23 +270,15 @@ ngs_IR*tel_IR
 
 plt.show()
 
-param['nLoop'] = 200
+param['nLoop'] = 1000
 # allocate memory to save data
 SR        = np.zeros(param['nLoop'])
 total     = np.zeros(param['nLoop'])
 residual  = np.zeros(param['nLoop'])
 wfsSignal = np.arange(0, wfs.nSignal)*0
-SE_PSF = []
-LE_PSF = np.log10(tel_vis.PSF_norma_zoom)
+SE_PSF    = []
+LE_PSF    = np.log10(tel_vis.PSF_norma_zoom)
 
-plot_obj = cl_plot(list_fig          = [atm.OPD,tel_vis.mean_removed_OPD,wfs.cam.frame,[dm.coordinates[:,0],np.flip(dm.coordinates[:,1]),dm.coefs],[[0,0],[0,0]],np.log10(tel_vis.PSF_norma_zoom),np.log10(tel_vis.PSF_norma_zoom)],\
-                   type_fig          = ['imshow','imshow','imshow','scatter','plot','imshow','imshow'],\
-                   list_title        = ['Turbulence OPD','Residual OPD','WFS Detector','DM Commands',None,None,None],\
-                   list_lim          = [None,None,None,None,None,[-4,0],[-4,0]],\
-                   list_label        = [None,None,None,None,['Time','WFE [nm]'],['Short Exposure PSF',''],['Long Exposure_PSF','']],\
-                   n_subplot         = [4,2],\
-                   list_display_axis = [None,None,None,None,True,None,None],\
-                   list_ratio        = [[0.95,0.95,0.1],[1,1,1,1]], s=5)
 # loop parameters
 gainCL  = 0.4
 display = True
@@ -289,9 +286,20 @@ wfs.cam.photonNoise = True
 
 reconstructor = M2C_CL @ calib_CL.M
 
+
+#%%
+plot_obj = cl_plot(list_fig          = [atm.OPD,tel_vis.mean_removed_OPD,wfs.cam.frame,[dm.coordinates[:,0],np.flip(dm.coordinates[:,1]),dm.coefs],[[0,0],[0,0]],np.log10(tel_vis.PSF_norma_zoom),np.log10(tel_vis.PSF_norma_zoom)],
+                   type_fig          = ['imshow','imshow','imshow','scatter','plot','imshow','imshow'],
+                   list_title        = ['Turbulence OPD','Residual OPD','WFS Detector','DM Commands',None,None,None],
+                   list_lim          = [None,None,None,None,None,[-4,0],[-4,0]],
+                   list_label        = [None,None,None,None,['Time','WFE [nm]'],['Short Exposure PSF',''],['Long Exposure_PSF','']],
+                   n_subplot         = [4,2],
+                   list_display_axis = [None,None,None,None,True,None,None],
+                   list_ratio        = [[0.95,0.95,0.1],[1,1,1,1]], s=5)
+
 for i in range(param['nLoop']):
-    a = time.time()
     # update phase screens => overwrite tel.OPD and consequently tel.src.phase
+    t_start = time.perf_counter()
     atm.update()
     # save phase variance
     total[i] = np.std(tel_vis.OPD[np.where(tel_vis.pupil>0)])*1e9
@@ -299,16 +307,18 @@ for i in range(param['nLoop']):
     turbPhase = tel_vis.src.phase
     # propagate to the WFS with the CL commands applied
     tel_vis*dm*wfs
-    
     dm.coefs -= gainCL * (reconstructor @ wfsSignal)
     # store the slopes after computing the commands => 2 frames delay
     wfsSignal = wfs.signal
-    b = time.time()
-    print('Elapsed time:', str(np.round((b-a)*1e3).astype('int')), 'ms')
+    t_end = time.perf_counter()
+    print('Elapseed time:', str(np.round((t_end-t_start)*1e3).astype('int')), 'ms')
     
     # update displays if required
-    tel_IR.OPD = tel_vis.OPD
-    tel_IR.computePSF(4)
+    tel_IR.OPD = tel_vis.OPD_no_pupil * tel_IR.pupil
+    t_start = time.perf_counter()
+    tel_IR.computePSF(zeroPaddingFactor=pixels_per_l_D_IR)
+    t_end = time.perf_counter()
+    print('FFT time:', str(np.round((t_end-t_start)*1e3).astype('int')), 'ms')
     
     if display == True:
         if i > 15:
@@ -331,6 +341,66 @@ for i in range(param['nLoop']):
     residual[i] = np.std( tel_vis.OPD[np.where(tel_vis.pupil > 0)] )*1e9
 
     print('Loop '+str(i)+'/'+str(param['nLoop'])+' -- turbulence: '+str(np.round(total[i],1))+', residual: ' +str(np.round(residual[i],1))+ '\n')
+
+
+#%%
+from tqdm import tqdm
+
+OPDs = []
+
+t_start = time.perf_counter()
+for i in tqdm(range(param['nLoop'])):
+    # update phase screens => overwrite tel.OPD and consequently tel.src.phase
+    atm.update()
+    # save phase variance
+    total[i] = np.std(tel_vis.OPD[np.where(tel_vis.pupil>0)])*1e9
+    # save turbulent phase
+    turbPhase = tel_vis.src.phase
+    # propagate to the WFS with the CL commands applied
+    tel_vis*dm*wfs
+    dm.coefs -= gainCL * (reconstructor @ wfsSignal)
+    # store the slopes after computing the commands => 2 frames delay
+    wfsSignal = wfs.signal
+
+    OPDs.append(tel_vis.OPD_no_pupil)
+
+    #print('Loop '+str(i)+'/'+str(param['nLoop'])+' -- turbulence: '+str(np.round(total[i],1))+', residual: ' +str(np.round(residual[i],1))+ '\n')
+t_end = time.perf_counter()
+print('Elapsed time:', str(np.round((t_end-t_start)*1e3).astype('int')), 'ms')
+
+OPDs = np.dstack(OPDs)
+
+#%%
+
+def binning(inp, N, regime='sum'):
+    if N == 1: return inp
+    xp = cp if hasattr(inp, 'device') else np
+    out = np.stack(np.split(xp.stack(np.split(np.atleast_3d(inp), inp.shape[0]//N, axis=0)), inp.shape[1]//N, axis=2))
+    if   regime == 'max':  func = xp.max
+    elif regime == 'mean': func = xp.mean
+    else: func = xp.sum 
+    return np.squeeze( np.transpose( func(out, axis=(2,3), keepdims=True), axes=(1,0,2,3,4)) )
+
+
+N_bin = 3
+
+pupil_smaller = binning(tel_IR.pupil, N_bin, 'max')
+amplitude     = binning(tel_IR.pupilReflectivity*np.sqrt(tel_IR.src.fluxMap), N_bin, regime='max') * pupil_smaller
+phase_chunk   = binning(OPDs, N_bin, 'mean') * np.atleast_3d(pupil_smaller) * 2*np.pi/tel_IR.src.wavelength
+EMF_chunk     = np.atleast_3d(amplitude)*np.exp(1j*phase_chunk)
+
+t_start = time.perf_counter()
+test = tel_IR.computePSFbatch(EMF_chunk, 256, pixels_per_l_D_IR)
+t_end = time.perf_counter()
+print('Elapsed time:', str(np.round((t_end-t_start)*1e3).astype('int')), 'ms')
+
+#%%
+
+crop = 32
+el_croppo = slice(test.shape[0]//2-crop//2, test.shape[1]//2+crop//2)
+el_croppo = (el_croppo, el_croppo, ...)
+
+plt.imshow(np.log(test.mean(axis=2)[el_croppo]))
 
 # %%
 
@@ -360,16 +430,3 @@ t_cpu = end_cpu - start_cpu
 print(t_cpu, t_gpu/1e3)
 # %%
 
-# 4x3
-# a = np.ones([12,2,2])
-# a *= (np.arange(12)+1)[:,None,None]
-
-start_cpu = time.perf_counter()
-a = np.ones([40**2,6,6])
-a = np.vstack(np.hstack(np.stack(np.vsplit(a, 40)).transpose(1,2,3,0)).transpose(2,0,1))
-end_cpu = time.perf_counter()
-t_cpu = end_cpu - start_cpu
-
-print(a.shape, t_cpu)
-
-# %%
