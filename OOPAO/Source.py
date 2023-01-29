@@ -5,12 +5,86 @@ Created on Wed Feb 19 10:32:15 2020
 @author: cheritie
 """
 import inspect
-
 import numpy as np
 
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% SOURCE PHOTOMETRY %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+class Photometry:
+    def __init__(self, inp=None):
+        self.bands = {
+            'U'   : [ 0.360e-6 , 0.070e-6 , 2.0e12 ],
+            'B'   : [ 0.440e-6 , 0.100e-6 , 5.4e12 ],
+            'V0'  : [ 0.500e-6 , 0.090e-6 , 3.3e12 ],
+            'V'   : [ 0.550e-6 , 0.090e-6 , 3.3e12 ],
+            'R'   : [ 0.640e-6 , 0.150e-6 , 4.0e12 ],
+            'I'   : [ 0.790e-6 , 0.150e-6 , 2.7e12 ],
+            'I1'  : [ 0.700e-6 , 0.033e-6 , 2.7e12 ],
+            'I2'  : [ 0.750e-6 , 0.033e-6 , 2.7e12 ],
+            'I3'  : [ 0.800e-6 , 0.033e-6 , 2.7e12 ],
+            'I4'  : [ 0.700e-6 , 0.100e-6 , 2.7e12 ],
+            'I5'  : [ 0.850e-6 , 0.100e-6 , 2.7e12 ],
+            'I6'  : [ 1.000e-6 , 0.100e-6 , 2.7e12 ],
+            'I7'  : [ 0.850e-6 , 0.300e-6 , 2.7e12 ],
+            'R2'  : [ 0.650e-6 , 0.300e-6 , 7.92e12],
+            'R3'  : [ 0.600e-6 , 0.300e-6 , 7.92e12],
+            'R4'  : [ 0.670e-6 , 0.300e-6 , 7.92e12],
+            'I8'  : [ 0.750e-6 , 0.100e-6 , 2.7e12 ],
+            'I9'  : [ 0.850e-6 , 0.300e-6 , 7.36e12],
+            'J'   : [ 1.215e-6 , 0.260e-6 , 1.9e12 ],
+            'H'   : [ 1.654e-6 , 0.290e-6 , 1.1e12 ],
+            'Kp'  : [ 2.1245e-6, 0.351e-6 , 6e11   ],
+            'Ks'  : [ 2.157e-6 , 0.320e-6 , 5.5e11 ],
+            'K'   : [ 2.179e-6 , 0.410e-6 , 7.0e11 ],
+            'L'   : [ 3.547e-6 , 0.570e-6 , 2.5e11 ],
+            'M'   : [ 4.769e-6 , 0.450e-6 , 8.4e10 ],
+            'Na'  : [ 0.589e-6 , 0.0      , 3.3e12 ],
+            'EOS' : [ 1.064e-6 , 0.0      , 3.3e12 ]
+        }
+        self.__wavelengths = np.array( [v[0] for _,v in self.bands.items()] )
 
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% CLASS INITIALIZATION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+        if inp is not None:
+            return self.__call__(inp)
 
+
+    def __call__(self, inp):
+        if isinstance(inp, str):
+            if inp not in self.bands.keys():
+                print('Error: there is no band with the name "'+inp+'"')
+                return None
+            else:
+                return self.bands[inp]
+
+        elif isinstance(inp, float):    # perform interpolation of parameters for a current wavelength
+            if inp < self.__wavelengths.min() or inp > self.__wavelengths.max():
+                print('Error: specified value is outside the defined wavelength range!')
+                return None
+
+            difference = np.abs(self.__wavelengths - inp)
+            dtype = [('number', int), ('value', float)]
+
+            sorted = np.sort(np.array([(num, val) for num,val in enumerate(difference)], dtype=dtype), order='value')                        
+
+            l_1 = self.__wavelengths[sorted[0][0]]
+            l_2 = self.__wavelengths[sorted[1][0]]
+
+            if l_1 > l_2: l_1, l_2 = l_2, l_1
+
+            def find_params(input):
+                for _,v in self.bands.items():
+                    if input == v[0]:
+                        return np.array(v)
+
+            p_1 = find_params(l_1)
+            p_2 = find_params(l_2)
+            weight = ( (np.array([l_1, inp, l_2])-l_1)/(l_2-l_1) )[1]
+
+            return weight*(p_2-p_1) + p_1
+
+        else:
+            print('Incorrect input: "'+inp+'"')
+            return None
+
+
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% SOURCE PHOTOMETRY %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
 class Source:    
     def __init__(self,optBand,magnitude,coordinates = [0,0],altitude = np.inf, laser_coordinates = [0,0] ,Na_profile = None,FWHM_spot_up = None,display_properties=True):
         """
@@ -52,7 +126,8 @@ class Source:
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% INITIALIZATION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
         self.is_initialized = False
         self.display_properties = display_properties
-        tmp             = self.photometry(optBand)              # get the photometry properties
+        photometry      = Photometry()
+        tmp             = photometry(optBand)                   # get the photometry properties
         self.optBand    = optBand                               # optical band
         self.wavelength = tmp[0]                                # wavelength in m
         self.bandwidth  = tmp[1]                                # optical bandwidth
@@ -93,72 +168,21 @@ class Source:
         if type(telescope.OPD) is list:
             telescope.resetOPD()
         
-        if np.ndim(telescope.OPD) ==3:
+        if np.ndim(telescope.OPD) == 3:
             telescope.resetOPD()
+
         # update the phase of the source
-        self.phase      = telescope.OPD*2*np.pi/self.wavelength
-        self.phase_no_pupil      = telescope.OPD_no_pupil*2*np.pi/self.wavelength
-
+        self.phase = telescope.OPD*2*np.pi/self.wavelength
+        self.phase_no_pupil = telescope.OPD_no_pupil*2*np.pi/self.wavelength
         # compute the variance in the pupil
-        self.var        = np.var(self.phase[np.where(telescope.pupil==1)])
+        self.var = np.var(self.phase[np.where(telescope.pupil==1)])
         # assign the source object to the telescope object
-
         self.fluxMap    = telescope.pupilReflectivity*self.nPhoton*telescope.samplingTime*(telescope.D/telescope.resolution)**2
         
         return telescope
      
     
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% SOURCE PHOTOMETRY %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
-
-    def photometry(self,arg):
-        # photometry object [wavelength, bandwidth, zeroPoint]
-        class phot:
-            pass
-        
-        phot.U      = [ 0.360e-6 , 0.070e-6 , 2.0e12 ]
-        phot.B      = [ 0.440e-6 , 0.100e-6 , 5.4e12 ]
-        phot.V0     = [ 0.500e-6 , 0.090e-6 , 3.3e12 ]
-        phot.V      = [ 0.550e-6 , 0.090e-6 , 3.3e12 ]
-        phot.R      = [ 0.640e-6 , 0.150e-6 , 4.0e12 ]
-        phot.I      = [ 0.790e-6 , 0.150e-6 , 2.7e12 ]
-        phot.I1     = [ 0.700e-6 , 0.033e-6 , 2.7e12 ]
-        phot.I2     = [ 0.750e-6 , 0.033e-6 , 2.7e12 ]
-        phot.I3     = [ 0.800e-6 , 0.033e-6 , 2.7e12 ]
-        phot.I4     = [ 0.700e-6 , 0.100e-6 , 2.7e12 ]
-        phot.I5     = [ 0.850e-6 , 0.100e-6 , 2.7e12 ]
-        phot.I6     = [ 1.000e-6 , 0.100e-6 , 2.7e12 ]
-        phot.I7     = [ 0.850e-6 , 0.300e-6 , 2.7e12 ]
-        phot.R2     = [ 0.650e-6 , 0.300e-6 , 7.92e12 ]
-        phot.R3     = [ 0.600e-6 , 0.300e-6 , 7.92e12 ]
-        phot.R4     = [ 0.670e-6 , 0.300e-6 , 7.92e12 ]
-        phot.I8     = [ 0.750e-6 , 0.100e-6 , 2.7e12 ]
-        phot.I9     = [ 0.850e-6 , 0.300e-6 , 7.36e12 ]
-        phot.I10    = [ 0.900e-6 , 0.300e-6 , 2.7e12 ]
-        phot.J      = [ 1.215e-6 , 0.260e-6 , 1.9e12 ]
-        phot.H      = [ 1.654e-6 , 0.290e-6 , 1.1e12 ]
-        phot.Kp     = [ 2.1245e-6 , 0.351e-6 , 6e11 ]
-        phot.Ks     = [ 2.157e-6 , 0.320e-6 , 5.5e11 ]
-        phot.K      = [ 2.179e-6 , 0.410e-6 , 7.0e11 ]
-        phot.K0     = [ 2.000e-6  , 0.410e-6 , 7.0e11 ]
-        phot.K1     = [ 2.400e-6 , 0.410e-6 , 7.0e11 ]
-
-
-        phot.L      = [ 3.547e-6 , 0.570e-6 , 2.5e11 ]
-        phot.M      = [ 4.769e-6 , 0.450e-6 , 8.4e10 ]
-        phot.Na     = [ 0.589e-6 , 0        , 3.3e12 ]
-        phot.EOS    = [ 1.064e-6 , 0        , 3.3e12 ]
-        
-        if isinstance(arg,str):
-            if hasattr(phot,arg):
-                return getattr(phot,arg)
-            else:
-                print('Error: Wrong name for the photometry object')
-                return -1
-        else:
-            print('Error: The photometry object takes a scalar as an input')
-            return -1   
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% SOURCE PROPERTIES %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
-
     @property
     def nPhoton(self):
         return self._nPhoton

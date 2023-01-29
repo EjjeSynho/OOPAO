@@ -12,7 +12,7 @@ import numpy as np
 
 
 class CalibrationVault():
-    def __init__(self,D,nTrunc=0,display=False, print_details = False,invert= True):
+    def __init__(self, D, nTrunc=0, display=False, print_details=False, invert=True):
         if print_details:
             print('Computing the SVD...')
         if invert:
@@ -24,7 +24,7 @@ class CalibrationVault():
         
             self.U = np.transpose(U)
             self.V = V
-            nEigenValues = len(s)-nTrunc
+            nEigenValues = len(s) - nTrunc
             
             self.iS = np.diag(1/self.eigenValues)        
             self.M  = np.transpose(self.V) @ self.iS @ self.U
@@ -55,12 +55,14 @@ class CalibrationVault():
                 plt.loglog(self.eigenValues)
                 plt.plot([0,nEigenValues],[self.eigenValues[nEigenValues-1],self.eigenValues[nEigenValues-1]])
         else:                
-            self.D=D
+            self.D = D
+
 
     @property
     def nTrunc(self):
         return self._nTrunc
     
+
     @nTrunc.setter
     def nTrunc(self,val):
         self._nTrunc=val
@@ -90,7 +92,6 @@ class CalibrationVault():
 
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% END %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
- 
     def show(self):
         attributes = inspect.getmembers(self, lambda a:not(inspect.isroutine(a)))
         print(self.tag+':')

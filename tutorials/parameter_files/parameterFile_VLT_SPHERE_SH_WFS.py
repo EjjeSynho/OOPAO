@@ -23,18 +23,28 @@ def initializeParameterFile():
     param['windSpeed'           ] = [10, 12, 11, 15, 20]                           # wind speed of the different layers in [m/s]
     param['windDirection'       ] = [0, 72, 144, 216, 288]                         # wind direction of the different layers in [degrees]
     param['altitude'            ] = [0, 1000, 5000, 10000, 12000]                  # altitude of the different layers in [m]
-               
-                              
+
+    ###%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% LOOP PROPERTIES %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    param['nLoop'               ] = 5000                                           # number of iteration
+    param['loopFrequency'       ] = 1000                                           # frequency at which loop is running
+    param['photonNoise'         ] = True                                           # Photon Noise enable  
+    param['readoutNoise'        ] = 1                                              # Readout Noise value
+    param['gainCL'              ] = 0.5                                            # integrator gain
+    param['nModes'              ] = 600                                            # number of KL modes controlled 
+    param['getProjector'        ] = True                                           # modal projector too get modal coefficients of the turbulence and residual phase
+                                     
     ###%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% M1 PROPERTIES %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    param['diameter'            ] = 8#.2                                            # diameter in [m]
+    param['diameter'            ] = 8#.2                                           # diameter in [m]
     param['nSubaperture'        ] = 40                                             # number of PWFS subaperture along the telescope diameter
     param['nPixelPerSubap'      ] = 6                                              # sampling of the PWFS subapertures
+    param['nPhotonPerSubaperture'] = 10
     param['resolution'          ] = param['nSubaperture']*param['nPixelPerSubap']  # resolution of the telescope driven by the PWFS
     param['sizeSubaperture'     ] = param['diameter']/param['nSubaperture']        # size of a sub-aperture projected in the M1 space
-    param['samplingTime'        ] = 1/1000                                         # loop sampling time in [s]
+    param['samplingTime'        ] = 1 / param['loopFrequency']                     # loop sampling time in [s]
     param['centralObstruction'  ] = 0.12                                           # central obstruction in percentage of the diameter
     param['nMissingSegments'    ] = 0                                              # number of missing segments on the M1 pupil
-    param['m1_reflectivity'     ] = 1                                              # reflectivity of the 798 segments
+    param['IR_reflectivity'     ] = 1                                              # reflectivity of the science path
+    param['vis_reflectivity'    ] = 0.3                                            # reflectivity of the SAXO path
     param['pixel scale'         ] = 12.3                                           # pixel scale in [mas] 
 
     ###%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% NGS PROPERTIES %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -57,20 +67,11 @@ def initializeParameterFile():
     param['tangentialScaling'   ] = 0                                              # tangential scaling in percentage of diameter
     
     ###%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% WFS PROPERTIES %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    param['modulation'           ] = 3                                             # modulation radius in ratio of wavelength over telescope diameter
-    param['lightThreshold'       ] = 0.5                                           # light threshold to select the valid pixels
-    param['unitCalibration'      ] = False                                         # calibration of the PWFS units using a ramp of Tip/Tilt    
-    param['is_geometric'         ] = False
+    param['modulation'          ] = 3                                              # modulation radius in ratio of wavelength over telescope diameter
+    param['lightThreshold'      ] = 0.5                                            # light threshold to select the valid pixels
+    param['unitCalibration'     ] = False                                          # calibration of the PWFS units using a ramp of Tip/Tilt    
+    param['is_geometric'        ] = False 
     
-    ###%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% LOOP PROPERTIES %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    param['nLoop'                ] = 5000                                         # number of iteration                             
-    param['photonNoise'          ] = True                                         # Photon Noise enable  
-    param['readoutNoise'         ] = 0                                            # Readout Noise value
-    param['gainCL'               ] = 0.5                                          # integrator gain
-    param['nModes'               ] = 600                                          # number of KL modes controlled 
-    param['nPhotonPerSubaperture'] = 10                                         # number of photons per subaperture (update of ngs.magnitude)
-    param['getProjector'         ] = True                                         # modal projector too get modal coefficients of the turbulence and residual phase
-
     ###%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% OUTPUT DATA %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     # name of the system
     param['name'] = 'VLT_' +  param['opticalBand science'] +'_band_'+ str(param['nSubaperture'])+'x'+ str(param['nSubaperture'])  

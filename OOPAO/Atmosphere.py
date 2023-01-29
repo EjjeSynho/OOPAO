@@ -103,7 +103,7 @@ class Atmosphere:
         self.asterism               = asterism          # case when multiple sources are considered (LGS and NGS)
         self.param                  = param
         if self.asterism is not None:
-            self.oversampling_factor    = np.max((np.asarray(self.asterism.coordinates)[:,0]/(self.tel.resolution/2)))
+            self.oversampling_factor = np.max((np.asarray(self.asterism.coordinates)[:,0]/(self.tel.resolution/2)))
         else:
             self.oversampling_factor = self.tel.src.coordinates[0]/(self.tel.resolution/2)
         

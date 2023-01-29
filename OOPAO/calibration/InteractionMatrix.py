@@ -9,7 +9,7 @@ import time
 from .CalibrationVault import CalibrationVault
 
 
-def InteractionMatrix(ngs, atm, tel, dm, wfs, M2C,stroke, phaseOffset=0, nMeasurements=50, noise='off', invert=True, print_time=True):
+def InteractionMatrix(ngs, atm, tel, dm, wfs, M2C, stroke, phaseOffset=0, nMeasurements=50, noise='off', invert=True, print_time=True):    
     if wfs.tag=='pyramid' and wfs.gpu_available:
         nMeasurements = 1
         print('Pyramid with GPU detected => using single mode measurement to increase speed.')
@@ -101,12 +101,12 @@ def InteractionMatrix(ngs, atm, tel, dm, wfs, M2C,stroke, phaseOffset=0, nMeasur
             b = time.time()
             print('Time elapsed: '+str(b-a)+' s' )
     
-    out=CalibrationVault(intMat,invert=invert)
+    out = CalibrationVault(intMat, invert=invert)
        
     return out
 
 
-def InteractionMatrixFromPhaseScreen(ngs,atm,tel,wfs,phasScreens,stroke,phaseOffset=0,nMeasurements=50,noise='off',invert=True,print_time=True):
+def InteractionMatrixFromPhaseScreen(ngs, atm, tel, wfs, phasScreens, stroke, phaseOffset=0, nMeasurements=50, noise='off', invert=True, print_time=True):
     #    disabled noise functionality from WFS
     if noise =='off':  
         wfs.cam.photonNoise  = 0
