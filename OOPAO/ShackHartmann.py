@@ -495,7 +495,7 @@ class ShackHartmann:
                     phase = self.telescope.phase_filtered   
                     self.initialize_flux(self.telescope.amplitude_filtered.T*self.telescope.src.fluxMap.T)
 
-                I = (np.abs(np.fft.fft2(np.asarray(self.get_lenslet_em_field(phase))[self.valid_subapertures_1D,:,:], axes=[1,2]) / norma)**2)
+                I = (np.abs(np.fft.fft2(np.asarray(self.get_lenslet_em_field(phase))[self.valid_subapertures_1D,:,:], axes=(1,2)) / norma)**2)
 
                 # reduce to valid subaperture
                 #I = I[self.valid_subapertures_1D,:,:]

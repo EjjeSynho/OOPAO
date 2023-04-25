@@ -456,6 +456,6 @@ def cl_plot(list_fig,plt_obj= None, type_fig = None,fig_number = 20,n_subplot = 
                         im_tmp.set_facecolor(m.to_rgba(data))
                         im_tmp.colorbar.update_normal(m)    
                 count+=1
-    plt.draw()
+    # plt.draw()
 
     

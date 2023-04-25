@@ -129,7 +129,7 @@ class Source:
         photometry      = Photometry()
         tmp             = photometry(optBand)                   # get the photometry properties
         self.optBand    = optBand                               # optical band
-        self.wavelength = tmp[0]                                # wavelength in m
+        self.wavelength = tmp[0]                                # wavelength in [m]
         self.bandwidth  = tmp[1]                                # optical bandwidth
         self.zeroPoint  = tmp[2]/368                            # zero point
         self.magnitude  = magnitude                             # magnitude
@@ -145,13 +145,12 @@ class Source:
         if Na_profile is not None and FWHM_spot_up is not None:
             self.Na_profile = Na_profile
             self.FWHM_spot_up = FWHM_spot_up
-            
             # consider the altitude weigthed by Na profile
             self.altitude = np.sum(Na_profile[0,:]*Na_profile[1,:])
-            self.type     = 'LGS'
+            self.type = 'LGS'
         else:
-            
-            self.type     = 'NGS'
+            self.type = 'NGS'
+
         if self.display_properties:
             print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% SOURCE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%') 
             print('{: ^18s}'.format('Source') +'{: ^18s}'.format('Wavelength')+ '{: ^18s}'.format('Zenith [arcsec]')+ '{: ^18s}'.format('Azimuth [deg]')+ '{: ^18s}'.format('Altitude [m]')+ '{: ^18s}'.format('Magnitude') + '{: ^18s}'.format('Flux [phot/m2/s]') )
@@ -177,7 +176,7 @@ class Source:
         # compute the variance in the pupil
         self.var = np.var(self.phase[np.where(telescope.pupil==1)])
         # assign the source object to the telescope object
-        self.fluxMap    = telescope.pupilReflectivity*self.nPhoton*telescope.samplingTime*(telescope.D/telescope.resolution)**2
+        self.fluxMap = telescope.pupilReflectivity * self.nPhoton * telescope.samplingTime * (telescope.D/telescope.resolution)**2
         
         return telescope
      
@@ -196,7 +195,7 @@ class Source:
             print('NGS flux updated!')
             print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% SOURCE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
             print('Wavelength \t'+str(round(self.wavelength*1e6,3)) + ' \t [microns]') 
-            print('Optical Band \t'+self.optBand) 
+            print('Optical Band \t'+str(self.optBand)) 
             print('Magnitude \t' + str(self.magnitude))
             print('Flux \t\t'+ str(np.round(self.nPhoton)) + str('\t [photons/m2/s]'))
             print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
