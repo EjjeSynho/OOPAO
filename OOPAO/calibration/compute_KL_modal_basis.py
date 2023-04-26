@@ -11,7 +11,7 @@ sys.path.insert(0, '..')
 import numpy as np
 from astropy.io import fits as pfits
 
-from OOPAO.calibration import OOPAO.calibration.ao_cockpit_psim as aou
+from OOPAO.calibration import ao_cockpit_psim as aou
 from ..tools.tools import createFolder
 
 def compute_KL_basis(tel,atm,dm):

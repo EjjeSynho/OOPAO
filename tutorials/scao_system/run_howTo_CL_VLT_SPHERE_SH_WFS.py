@@ -5,6 +5,7 @@
 
 import sys
 sys.path.insert(0, '..')
+sys.path.insert(0, '../..')
 
 import time
 import os
@@ -186,8 +187,10 @@ def magnitudeFromPhotons(tel, photons, band, sampling_time):
     nPhoton = np.nansum(fluxMap / tel.pupilReflectivity) / (np.pi*(tel.D/2)**2) / sampling_time
     return -2.5 * np.log10(368 * nPhoton / zero_point )
 
-photometry = Photometry()
-vis_band = photometry(param['opticalBand WFS'])
+# photometry = Photometry()
+# vis_band = photometry(param['opticalBand WFS'])
+
+vis_band = 8
 
 SAXO_mag = magnitudeFromPhotons(tel_vis, flux_per_frame, vis_band, 1/param['loopFrequency'])
 

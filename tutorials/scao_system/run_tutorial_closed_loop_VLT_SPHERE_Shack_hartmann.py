@@ -1,9 +1,16 @@
-# -*- coding: utf-8 -*-
+#%% -*- coding: utf-8 -*-
 """
 Created on Wed Oct 21 10:51:32 2020
 
 @author: cheritie
 """
+%reload_ext autoreload
+%autoreload 2
+%matplotlib inline
+
+import sys
+sys.path.insert(0, '..')
+sys.path.insert(0, '../..')
 
 import time
 
@@ -18,16 +25,17 @@ from OOPAO.Source import Source
 from OOPAO.Telescope import Telescope
 from OOPAO.calibration.InteractionMatrix import InteractionMatrix
 from OOPAO.calibration.compute_KL_modal_basis import compute_M2C
-from OOPAO.tools.displayTools import cl_plot, displayMap
+
 # %% -----------------------     read parameter file   ----------------------------------
+from OOPAO.tools.displayTools import cl_plot, displayMap
 from parameter_files.parameterFile_VLT_SPHERE_SH_WFS import initializeParameterFile
 
 param = initializeParameterFile()
+param['resolution'] = 320
 
-# %%
 plt.ion()
 
-# %% -----------------------     TELESCOPE   ----------------------------------
+# % -----------------------     TELESCOPE   ----------------------------------
 
 # create the Telescope object
 tel = Telescope(resolution=param['resolution'], \
@@ -110,7 +118,6 @@ plt.ylabel('[m]')
 plt.title('DM Actuator Coordinates')
 
 # %% -----------------------     SH WFS   ----------------------------------
-
 # make sure tel and atm are separated to initialize the PWFS
 tel - atm
 
@@ -169,7 +176,6 @@ plt.title('KL mode normalization projected on the DM')
 plt.show()
 
 # %%
-
 # wfs.is_geometric = False
 
 stroke = 1e-9
@@ -294,3 +300,5 @@ for i in range(param['nLoop']):
 
     print('Loop' + str(i) + '/' + str(param['nLoop']) + ' Turbulence: ' + str(total[i]) + ' -- Residual:' + str(
         residual[i]) + '\n')
+
+# %%
