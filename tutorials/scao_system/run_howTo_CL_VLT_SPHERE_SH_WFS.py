@@ -16,7 +16,7 @@ from OOPAO.Atmosphere import Atmosphere
 from OOPAO.DeformableMirror import DeformableMirror
 from OOPAO.MisRegistration import MisRegistration
 from OOPAO.ShackHartmann import ShackHartmann
-from OOPAO.Source import Source, Photometry
+from OOPAO.Source import Source#, Photometry
 from OOPAO.Telescope import Telescope
 from OOPAO.calibration.compute_KL_modal_basis import compute_M2C
 from OOPAO.tools.displayTools import displayMap
@@ -189,17 +189,22 @@ def magnitudeFromPhotons(tel, photons, band, sampling_time):
 
 # photometry = Photometry()
 # vis_band = photometry(param['opticalBand WFS'])
+# SAXO_mag = magnitudeFromPhotons(tel_vis, flux_per_frame, vis_band, 1/param['loopFrequency'])
 
 vis_band = 8
-
-SAXO_mag = magnitudeFromPhotons(tel_vis, flux_per_frame, vis_band, 1/param['loopFrequency'])
+SAXO_mag = 8
 
 param['magnitude WFS'] = SAXO_mag
 param['magnitude science'] = SAXO_mag #TODO: fix it
 
-ngs_vis  = Source(optBand=param['opticalBand WFS'],    magnitude=param['magnitude WFS'])
-ngs_IR_L = Source(optBand=param['wavelength (left)'],  magnitude=param['magnitude science'])
-ngs_IR_R = Source(optBand=param['wavelength (right)'], magnitude=param['magnitude science'])
+# ngs_vis  = Source(optBand=param['opticalBand WFS'],    magnitude=param['magnitude WFS'])
+# ngs_IR_L = Source(optBand=param['wavelength (left)'],  magnitude=param['magnitude science'])
+# ngs_IR_R = Source(optBand=param['wavelength (right)'], magnitude=param['magnitude science'])
+
+ngs_vis  = Source(optBand='V',    magnitude=param['magnitude WFS'])
+ngs_IR_L = Source(optBand='H', magnitude=param['magnitude science'])
+ngs_IR_R = Source(optBand='H', magnitude=param['magnitude science'])
+
 
 ngs_IR_R.nPhoton = ngs_IR_L.nPhoton
 

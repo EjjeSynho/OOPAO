@@ -31,8 +31,9 @@ from OOPAO.tools.displayTools import cl_plot, displayMap
 from parameter_files.parameterFile_VLT_SPHERE_SH_WFS import initializeParameterFile
 
 param = initializeParameterFile()
-param['resolution'] = 320
-
+# param['resolution'] = 320
+param['opticalBand'] = 'R'
+param['magnitude'] = 8
 plt.ion()
 
 # % -----------------------     TELESCOPE   ----------------------------------
@@ -54,6 +55,7 @@ plt.figure()
 plt.imshow(tel.pupilReflectivity)
 # %% -----------------------     NGS   ----------------------------------
 # create the Source object
+
 ngs = Source(optBand=param['opticalBand'], \
              magnitude=param['magnitude'])
 
@@ -212,6 +214,8 @@ plt.ylabel('WFS slopes STD')
 
 # %%
 # These are the calibration data used to close the loop
+# %matplotlib inline
+%matplotlib qt
 wfs.is_geometric = False
 
 calib_CL = calib_KL_geo
@@ -301,4 +305,5 @@ for i in range(param['nLoop']):
     print('Loop' + str(i) + '/' + str(param['nLoop']) + ' Turbulence: ' + str(total[i]) + ' -- Residual:' + str(
         residual[i]) + '\n')
 
+    # plt.show()
 # %%
