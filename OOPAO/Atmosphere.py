@@ -269,7 +269,7 @@ class Atmosphere:
         tmp                                 = globalTransformation(layer.mapShift,shiftMatrix)
         onePixelShiftedPhaseScreen          = tmp[1:-1,1:-1]        
         Z                                   = onePixelShiftedPhaseScreen[layer.innerMask[1:-1,1:-1]!=0]
-        X                                   = layer.A@Z + layer.B@layer.randomState.normal(size=layer.B.shape[1])
+        X                                   = layer.A @ Z + layer.B @ layer.randomState.normal(size=layer.B.shape[1])
         layer.mapShift[layer.outerMask!=0]  = X
         layer.mapShift[layer.outerMask==0]  = np.reshape(onePixelShiftedPhaseScreen,layer.resolution*layer.resolution)
         return onePixelShiftedPhaseScreen
@@ -310,7 +310,6 @@ class Atmosphere:
                 stepInPixel[np.where(nScreens==nScreens.min())]=0
                 layer.phase = self.add_row(layer,stepInPixel)
             
-            
             stepInSubPixel[0] =  (np.abs(layer.ratio[0])%1)*np.sign(layer.ratio[0])
             stepInSubPixel[1] =  (np.abs(layer.ratio[1])%1)*np.sign(layer.ratio[1])
             
@@ -331,9 +330,9 @@ class Atmosphere:
     def update(self):
         phase_support = self.initialize_phase_support()
         for i_layer in range(self.nLayer):
-            tmpLayer=getattr(self,'layer_'+str(i_layer+1))
+            tmpLayer = getattr(self,'layer_'+str(i_layer+1))
             self.updateLayer(tmpLayer)
-            phase_support = self.fill_phase_support(tmpLayer,phase_support,i_layer)
+            phase_support = self.fill_phase_support(tmpLayer,phase_support, i_layer)
         self.set_OPD(phase_support)
         if self.telescope.isPaired:
             self*self.telescope
@@ -347,6 +346,8 @@ class Atmosphere:
             for i in range(self.asterism.n_source):
                 phase_support.append(np.zeros([self.telescope.resolution,self.telescope.resolution]))
         return phase_support
+
+
     def fill_phase_support(self,tmpLayer,phase_support,i_layer):
         if self.asterism is None:
             phase_support+= np.reshape(tmpLayer.phase[np.where(tmpLayer.pupil_footprint==1)],[self.telescope.resolution,self.telescope.resolution])* np.sqrt(self.fractionalR0[i_layer])
@@ -358,6 +359,7 @@ class Atmosphere:
                     sub_im = np.reshape(tmpLayer.phase[np.where(tmpLayer.pupil_footprint[i]==1)],[self.telescope.resolution,self.telescope.resolution])
                     alpha_cone = np.arctan(self.telescope.D/2/self.asterism.altitude[i])
                     h = self.asterism.altitude[i]-tmpLayer.altitude
+
                     if np.isinf(h):
                         r =self.telescope.D/2
                     else:
@@ -369,12 +371,13 @@ class Atmosphere:
                     pixel_size_out  = pixel_size_in/ratio
                     resolution_out  = self.telescope.resolution
 
-                    phase_support[i]+= np.squeeze(interpolate_cube(cube_in, pixel_size_in, pixel_size_out, resolution_out)).T* np.sqrt(self.fractionalR0[i_layer])
+                    phase_support[i] += np.squeeze(interpolate_cube(cube_in, pixel_size_in, pixel_size_out, resolution_out)).T* np.sqrt(self.fractionalR0[i_layer])
 
                 else:
                     phase_support[i]+= np.reshape(tmpLayer.phase[np.where(tmpLayer.pupil_footprint[i]==1)],[self.telescope.resolution,self.telescope.resolution])* np.sqrt(self.fractionalR0[i_layer])
         return phase_support
     
+
     def set_OPD(self,phase_support):
         if self.asterism is None:
             self.OPD_no_pupil   = phase_support*self.wavelength/2/np.pi

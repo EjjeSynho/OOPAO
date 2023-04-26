@@ -5,6 +5,9 @@ Created on Wed Oct 21 10:57:29 2020
 @author: cheritie
 """
 
+import sys
+sys.path.insert(0, '..')
+
 import numpy as np
 from astropy.io import fits as pfits
 
@@ -105,8 +108,12 @@ def compute_M2C(telescope, atmosphere, deformableMirror, param = None, nameFolde
     
     print('Computing Specific Modes ...')
     print(' ')
-    GEO = aou.mkp(telescope.resolution/telescope.resolution*diameter,telescope.resolution,diameter,0.)
-    
+    GEO = aou.mkp(real_sz = telescope.resolution/telescope.resolution*diameter,
+                  dim_x   = telescope.resolution,
+                  diam    = diameter,
+                  eps     = 0.0)
+                
+
     if nZer is not None and SpM_2D is None:
         SpM_2D = aou.give_zernike(GEO, diameter, nZer)
         nspm = nZer

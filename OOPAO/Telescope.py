@@ -112,7 +112,7 @@ class Telescope:
 #        Case where the pupil is not input: circular pupil with central obstruction    
         if pupil is None:
             D           = self.resolution+1
-            x           = np.linspace(-self.resolution/2,self.resolution/2,self.resolution)
+            x           = np.linspace(-self.resolution/2, self.resolution/2, self.resolution)
             xx,yy       = np.meshgrid(x,x)
             circle      = xx**2+yy**2
             obs         = circle>=(self.centralObstruction*D/2)**2
@@ -136,6 +136,7 @@ class Telescope:
         self.print_properties()
 
         self.isInitialized= True
+
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PSF COMPUTATION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
 
     def computeCoronoPSF(self,zeroPaddingFactor=2, display = False):
@@ -256,7 +257,7 @@ class Telescope:
         self.PSF_norma_zoom  = self.PSF_norma[N_crop:-N_crop,N_crop:-N_crop]
     
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PSF DISPLAY %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
-    def showPSF(self,zoom = 1):
+    def showPSF(self, zoom=1):
         # display the full PSF or zoom on the core of the PSF
         if hasattr(self, 'PSF'): 
             print('Displaying the PSF...')
