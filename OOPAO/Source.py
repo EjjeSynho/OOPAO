@@ -110,6 +110,10 @@ class Source:
         _ src.nPhoton   : number of photons per m2 per s. if this property is changed after the initialization, the magnitude is automatically updated to the right value. 
         _ src.fluxMap   : 2D map of the number of photons per pixel per frame (depends on the loop frequency defined by tel.samplingTime)  
         _ src.display_properties : display the properties of the src object
+        
+        The main properties of the object can be displayed using :
+            src.print_properties()
+            
         ************************** OPTIONAL PROPERTIES **************************
         _ altitude              : altitude of the source. Default is inf (NGS) 
         _ laser_coordinates     : The coordinates in [m] of the laser launch telescope
@@ -149,15 +153,12 @@ class Source:
             self.altitude = np.sum(Na_profile[0,:]*Na_profile[1,:])
             self.type = 'LGS'
         else:
-            self.type = 'NGS'
+            
+            self.type     = 'NGS'
 
         if self.display_properties:
-            print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% SOURCE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%') 
-            print('{: ^18s}'.format('Source') +'{: ^18s}'.format('Wavelength')+ '{: ^18s}'.format('Zenith [arcsec]')+ '{: ^18s}'.format('Azimuth [deg]')+ '{: ^18s}'.format('Altitude [m]')+ '{: ^18s}'.format('Magnitude') + '{: ^18s}'.format('Flux [phot/m2/s]') )
-            print('------------------------------------------------------------------------------------------------------------------------------')
+            self.print_properties()
             
-            print('{: ^18s}'.format(self.type) +'{: ^18s}'.format(str(self.wavelength))+ '{: ^18s}'.format(str(self.coordinates[0]))+ '{: ^18s}'.format(str(self.coordinates[1]))+'{: ^18s}'.format(str(np.round(self.altitude,2)))+ '{: ^18s}'.format(str(self.magnitude))+'{: ^18s}'.format(str(np.round(self.nPhoton,1))) )
-            print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%') 
         self.is_initialized = True
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% SOURCE INTERACTION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
@@ -176,8 +177,15 @@ class Source:
         # compute the variance in the pupil
         self.var = np.var(self.phase[np.where(telescope.pupil==1)])
         # assign the source object to the telescope object
-        self.fluxMap = telescope.pupilReflectivity * self.nPhoton * telescope.samplingTime * (telescope.D/telescope.resolution)**2
-        
+
+        self.fluxMap    = telescope.pupilReflectivity*self.nPhoton*telescope.samplingTime*(telescope.D/telescope.resolution)**2
+        if telescope.optical_path is None:
+            telescope.optical_path = []
+            telescope.optical_path.append([self.type + '('+self.optBand+')',id(self)])
+            telescope.optical_path.append([telescope.tag,id(telescope)])
+        else:
+            telescope.optical_path[0] =[self.type + '('+self.optBand+')',id(self)]
+            
         return telescope
      
     
@@ -227,3 +235,9 @@ class Source:
                         if np.ndim(a[1])>1:
                             print('          '+str(a[0])+': '+str(np.shape(a[1])))   
             
+    def print_properties(self):
+        print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% SOURCE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%') 
+        print('{: ^18s}'.format('Source') +'{: ^18s}'.format('Wavelength')+ '{: ^18s}'.format('Zenith [arcsec]')+ '{: ^18s}'.format('Azimuth [deg]')+ '{: ^18s}'.format('Altitude [m]')+ '{: ^18s}'.format('Magnitude') + '{: ^18s}'.format('Flux [phot/m2/s]') )
+        print('------------------------------------------------------------------------------------------------------------------------------')        
+        print('{: ^18s}'.format(self.type) +'{: ^18s}'.format(str(self.wavelength))+ '{: ^18s}'.format(str(self.coordinates[0]))+ '{: ^18s}'.format(str(self.coordinates[1]))+'{: ^18s}'.format(str(np.round(self.altitude,2)))+ '{: ^18s}'.format(str(self.magnitude))+'{: ^18s}'.format(str(np.round(self.nPhoton,1))) )
+        print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%') 

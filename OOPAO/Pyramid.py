@@ -60,7 +60,7 @@ class Pyramid:
         _ lightRatio            : criterion to select the valid subaperture based on flux considerations
         _ n_pix_separation      : number of pixels separating the Pyramid Pupils in number of pixels of the detector    -- default value is 2 pixels
         _ n_pix_edge            : number of pixel at the edge of the Pyramid Pupils in number of pixels of the detector -- default value is n_pix_separation's value
-        _ postProcessing        : processing of the signals ('fullFrame' or 'slopesMaps')                               -- default value is 'slopesMaps'
+        _ postProcessing        : processing of the signals ('fullFrame','slopesMaps','fullFrame_incidence_flux','slopesMaps_incidence_flux')                               -- default value is 'slopesMaps'
         
         DEPRECIATED PARAMETERS:
         _ pupilSeparationRatio  : Separation ratio of the PWFS pupils (Diameter/Distance Center to Center) -- DEPRECIATED -> use n_pix_separation instead)
@@ -102,6 +102,10 @@ class Pyramid:
         _ wfs.random_state_background    : a random state cycle can be defined to reproduces random sequences of noise -- default is based on the current clock time   
         _ wfs.fov                        : Field of View of the Pyramid in arcsec
 
+        The main properties of the object can be displayed using :
+            wfs.print_properties()
+
+
         the following properties can be updated on the fly:
             _ wfs.modulation            : update the modulation radius and update the reference signal
             _ wfs.cam.photonNoise       : Photon noise can be set to True or False
@@ -119,7 +123,7 @@ class Pyramid:
             self.convert_for_numpy = np_cp.asnumpy
             self.nJobs = 1
             self.mempool = np_cp.get_default_memory_pool()
-            from AO_modules.tools.tools import get_gpu_memory
+            from .tools.tools import get_gpu_memory
             self.mem_gpu = get_gpu_memory()
             
             print('GPU available!')    
@@ -138,6 +142,8 @@ class Pyramid:
         self.telescope                  = telescope                                         # telescope attached to the wfs
         if self.telescope.resolution/nSubap <4 or (self.telescope.resolution/nSubap)%2 !=0:
             raise ValueError('The resolution should be an even number and be a multiple of 2**i where i>=2')
+        if self.telescope.src is None:
+            raise AttributeError('The telescope was not coupled to any source object! Make sure to couple it with an src object using src*tel')
         self.delta_theta                = delta_theta                                       # delta theta in degree to change the position of the modulation point (default is 0 <=> modulation point on the edge of two sides of the pyramid)
         self.nTheta_user_defined        = nTheta_user_defined                               # user defined number of modulation point
         self.extraModulationFactor      = extraModulationFactor                             # Extra Factor to increase/reduce the number of modulation point (extraModulationFactor = 1 means 4 modulation points added, 1 for each quadrant)
@@ -222,9 +228,9 @@ class Pyramid:
         # joblib settings for parallization
         if self.gpu_available is False:
             if n_cpu > 16:
-                self.nJobs                      = 32                                                                 # number of jobs for the joblib package
+                self.nJobs                      = 8                                                                 # number of jobs for the joblib package
             else:
-                self.nJobs                      = 8
+                self.nJobs                      = 6
             self.n_max = 20*500
         else:
             # quantify GPU max memory usage
@@ -261,16 +267,8 @@ class Pyramid:
         self.telescope.resetOPD()
         self.wfs_measure(phase_in=self.telescope.src.phase)
         
-        print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PYRAMID WFS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
-        print('{: ^18s}'.format('Pupils Diameter')      + '{: ^18s}'.format(str(self.nSubap))                       +'{: ^18s}'.format('[pixels]'   ))
-        print('{: ^18s}'.format('Pupils Separation')    + '{: ^18s}'.format(str(self.n_pix_separation))             +'{: ^18s}'.format('[pixels]'   ))
-        print('{: ^18s}'.format('FoV')                  + '{: ^18s}'.format(str(np.round(self.fov,2)))              +'{: ^18s}'.format('[arcsec]'   ))
-        print('{: ^18s}'.format('TT Modulation')        + '{: ^18s}'.format(str(self.modulation))                   +'{: ^18s}'.format('[lamda/D]'  ))
-        print('{: ^18s}'.format('PSF Core Sampling')    + '{: ^18s}'.format(str(1+self.psfCentering*3))             +'{: ^18s}'.format('[pixel(s)]' ))
-        print('{: ^18s}'.format('Valid Pixels')         + '{: ^18s}'.format(str(self.nSignal))                    +'{: ^18s}'.format('[pixel(s)]' ))
-        print('{: ^18s}'.format('Signal Computation')   + '{: ^18s}'.format(str(self.postProcessing)                                                ))
-        print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
-
+        self.print_properties()
+        
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% WFS INITIALIZATION PROPERTIES %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
     def mask_computation(self):
         print('Pyramid Mask initialization...')
@@ -388,20 +386,20 @@ class Pyramid:
                 self.validSignal    = np.concatenate((self.validI4Q,self.validI4Q))
                 self.nSignal        = int(np.sum(self.validSignal))
                 
-            if self.postProcessing == 'fullFrame':
+            if self.postProcessing == 'fullFrame' or self.postProcessing == 'fullFrame_incidence_flux':
                 # select the valid pixels of the detector according to the flux (case full-frame)
                 self.validSignal = (self.initFrame>=self.lightRatio*self.initFrame.max())   
                 self.nSignal        = int(np.sum(self.validSignal))
         else:
             print('You are using a user-defined mask for the selection of the valid pixel')
-            if self.postProcessing == 'slopesMaps':
+            if self.postProcessing == 'slopesMaps' or self.postProcessing == 'slopesMaps_incidence_flux':
                 
                 # select the valid pixels of the detector according to the flux (case full-frame)
                 self.validI4Q       =  self.userValidSignal
                 self.validSignal    = np.concatenate((self.validI4Q,self.validI4Q))
                 self.nSignal        = int(np.sum(self.validSignal))
                 
-            if self.postProcessing == 'fullFrame':            
+            if self.postProcessing == 'fullFrame' or self.postProcessing == 'fullFrame_incidence_flux':            
                 self.validSignal    = self.userValidSignal  
                 self.nSignal        = int(np.sum(self.validSignal))
                     
@@ -683,6 +681,16 @@ class Pyramid:
             slopes     = slopesMaps[np.where(self.validSignal==1)]
             return slopesMaps,slopes
         
+        if self.postProcessing == 'fullFrame_incidence_flux':
+            # global normalization
+            subArea     = (self.telescope.D / self.nSubap)**2
+            norma       = np.float64(self.telescope.src.nPhoton*self.telescope.samplingTime*subArea)/4
+            # 2D full-frame
+            fullFrameMaps  = (cameraFrame / norma )  - self.referenceSignal_2D
+            # full-frame vector
+            fullFrame  = fullFrameMaps[np.where(self.validSignal==1)]
+            
+            return fullFrameMaps,fullFrame
         if self.postProcessing == 'fullFrame':
             # global normalization
             norma = np.sum(cameraFrame[self.validSignal])
@@ -778,14 +786,14 @@ class Pyramid:
                 self.validPix           = (self.initFrame>=self.lightRatio*self.initFrame.max())   
                 
                 # save the number of signals depending on the case    
-                if self.postProcessing == 'slopesMaps':
+                if self.postProcessing == 'slopesMaps' or self.postProcessing == 'slopesMaps_incidence_flux':
                     self.nSignal        = np.sum(self.validSignal)
                     # display
                     xPix,yPix = np.where(self.validI4Q==1)
                     plt.figure()
                     plt.imshow(self.I4Q.T)
                     plt.plot(xPix,yPix,'+')
-                if self.postProcessing == 'fullFrame':
+                if self.postProcessing == 'fullFrame' or self.postProcessing == 'fullFrame_incidence_flux':
                     self.nSignal        = np.sum(self.validPix)  
                 print('Done!')
 
@@ -955,6 +963,17 @@ class Pyramid:
                             print('          '+str(a[0])+': '+str(np.shape(a[1])))    
 
 
+    def print_properties(self):
+        
+        print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PYRAMID WFS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
+        print('{: ^18s}'.format('Pupils Diameter')      + '{: ^18s}'.format(str(self.nSubap))                       +'{: ^18s}'.format('[pixels]'   ))
+        print('{: ^18s}'.format('Pupils Separation')    + '{: ^18s}'.format(str(self.n_pix_separation))             +'{: ^18s}'.format('[pixels]'   ))
+        print('{: ^18s}'.format('FoV')                  + '{: ^18s}'.format(str(np.round(self.fov,2)))              +'{: ^18s}'.format('[arcsec]'   ))
+        print('{: ^18s}'.format('TT Modulation')        + '{: ^18s}'.format(str(self.modulation))                   +'{: ^18s}'.format('[lamda/D]'  ))
+        print('{: ^18s}'.format('PSF Core Sampling')    + '{: ^18s}'.format(str(1+self.psfCentering*3))             +'{: ^18s}'.format('[pixel(s)]' ))
+        print('{: ^18s}'.format('Valid Pixels')         + '{: ^18s}'.format(str(self.nSignal))                    +'{: ^18s}'.format('[pixel(s)]' ))
+        print('{: ^18s}'.format('Signal Computation')   + '{: ^18s}'.format(str(self.postProcessing)                                                ))
+        print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
 
-                                   
+   
         

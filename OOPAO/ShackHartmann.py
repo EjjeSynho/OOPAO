@@ -35,7 +35,7 @@ except:
 
 
 class ShackHartmann:
-    def __init__(self, nSubap, telescope, lightRatio, threshold_cog=0.01, is_geometric=False, binning_factor=1, padding_extension_factor=1, threshold_convolution=0.05):
+    def __init__(self,nSubap,telescope,lightRatio,threshold_cog = 0.01,is_geometric = False, binning_factor = 1,padding_extension_factor = 1, threshold_convolution = 0.05,shannon_sampling = False):
         """
         ************************** REQUIRED PARAMETERS **************************
         
@@ -52,7 +52,8 @@ class ShackHartmann:
         _ threshold_cog             : threshold (with respect to the maximum value of the image) to apply to compute the center of gravity of the spots
         _ is_geometric              : if True, enables the geometric Shack Hartmann (direct measurement of gradient) if False, the diffractive computation is considered (default)
         _ binning_factor            : binning factor of the detector -- default Value is 1
-        
+        _ shannon_sampling          : If True, the lenslet array spots are sampled at the same sampling as the FFT (2 pix per FWHM). If False, the sampling is 1 pix per FWHM (default).
+            
         # LGS related properties
         _ padding_extension_factor  : zero-padding factor oon the spots intensity images. This is a fast way to provide a larger field of view before the convolution with LGS spots is achieved and allow to prevent wrapping effects
         _threshold_convolution      : threshold considered to force the gaussian spots (elungated spots) to go to zero on the edges
@@ -78,26 +79,29 @@ class ShackHartmann:
         _ wfs.fov_lenslet_arcsec         : Field of View of the subapertures in arcsec
         _ wfs.fov_pixel_binned_arcsec    : Field of View of the pixel in arcsec
         
+        The main properties of the object can be displayed using :
+            wfs.print_properties()
+        
         the following properties can be updated on the fly:
-            _ wfs.modulation            : update the modulation radius and update the reference signal
+            _ wfs.is_geometric          : switch between diffractive and geometric shackHartmann
             _ wfs.cam.photonNoise       : Photon noise can be set to True or False
             _ wfs.cam.readoutNoise      : Readout noise can be set to True or False
-            _ wfs.backgroundNoise       : Background noise can be set to True or False
             _ wfs.lightRatio            : reset the valid subaperture selection considering the new value
         
         """ 
-        self.tag                      = 'shackHartmann'
-        self.telescope                = telescope
-        self.is_geometric             = is_geometric
-        self.nSubap                   = nSubap
-        self.lightRatio               = lightRatio
-        self.binning_factor           = binning_factor
-        self.zero_padding             = 2
-        self.padding_extension_factor = padding_extension_factor
-        self.threshold_convolution    = threshold_convolution
-        self.threshold_cog            = threshold_cog
-        self.cog_weight               = 1
-        
+        self.tag                            = 'shackHartmann'
+        self.telescope                      = telescope
+        if self.telescope.src is None:
+            raise AttributeError('The telescope was not coupled to any source object! Make sure to couple it with an src object using src*tel')
+        self.is_geometric                   = is_geometric
+        self.nSubap                         = nSubap
+        self.lightRatio                     = lightRatio
+        self.binning_factor                 = binning_factor
+        self.zero_padding                   = 2
+        self.padding_extension_factor       = padding_extension_factor
+        self.threshold_convolution          = threshold_convolution
+        self.threshold_cog                  = threshold_cog
+        self.shannon_sampling               = shannon_sampling
 
         # case where the spots are zeropadded to provide larger fOV
         if padding_extension_factor > 2:
@@ -132,7 +136,7 @@ class ShackHartmann:
         self.random_state_background    = np.random.RandomState(seed=int(time.time()))      # random states to reproduce sequences of noise 
         
         # field of views
-        self.fov_lenslet_arcsec         = self.n_pix_subap*206265*self.binning_factor/self.padding_extension_factor*self.telescope.src.wavelength/(self.telescope.D/self.nSubap)
+        self.fov_lenslet_arcsec         = (self.n_pix_subap*206265*self.binning_factor/self.padding_extension_factor*self.telescope.src.wavelength/(self.telescope.D/self.nSubap))/(1+self.shannon_sampling)
         self.fov_pixel_arcsec           = self.fov_lenslet_arcsec/ self.n_pix_subap
         self.fov_pixel_binned_arcsec    = self.fov_lenslet_arcsec/ self.n_pix_subap_init
 
@@ -242,29 +246,13 @@ class ShackHartmann:
         self.p = np.polyfit(np.linspace(-2,2,5)*amp,mean_slope,deg = 1)
         self.slopes_units = np.abs(self.p[0])
         print('Done!')
-
-        self.cam.photonNoise  = readoutNoise
-        self.cam.readoutNoise = photonNoise
+        self.cam.photonNoise        = readoutNoise
+        self.cam.readoutNoise       = photonNoise
         self.telescope.resetOPD()
-
-        print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% SHACK HARTMANN WFS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
-        print('{: ^20s}'.format('Subapertures')      + '{: ^18s}'.format(str(self.nSubap)))
-        print('{: ^20s}'.format('Subaperture Size')  + '{: ^18s}'.format(str(np.round(self.telescope.D/self.nSubap,2))) + '{: ^18s}'.format('[m]'   ))
-        print('{: ^20s}'.format('Pixel FoV')         + '{: ^18s}'.format(str(np.round(self.fov_pixel_binned_arcsec,2))) + '{: ^18s}'.format('[arcsec]'))
-        print('{: ^20s}'.format('Subapertue FoV')    + '{: ^18s}'.format(str(np.round(self.fov_lenslet_arcsec,2)))      + '{: ^18s}'.format('[arcsec]'))
-        print('{: ^20s}'.format('Valid Subaperture') + '{: ^18s}'.format(str(str(self.nValidSubaperture))))
         
-        if self.is_LGS:
-            print('{: ^20s}'.format('Spot Elungation')    + '{: ^18s}'.format(str(100*np.round(self.elungation_factor,3)))      +'{: ^18s}'.format('% of a subap' ))
-        
-        print('{: ^20s}'.format('Geometric WFS')    + '{: ^18s}'.format(str(self.is_geometric)))
-        print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
+        self.print_properties()
 
-        if self.is_geometric:
-            print('WARNING: THE PHOTON AND READOUT NOISE ARE NOT CONSIDERED FOR GEOMETRIC SH-WFS')
-
-
-    def centroid(self, image, threshold=0.01, weight=1):
+    def centroid(self,image,threshold =0.01):
         im = np.atleast_3d(image.copy())    
         # im[ im<(threshold*im.max()) ] = 0
         im[im < threshold] = 0
@@ -513,10 +501,19 @@ class ShackHartmann:
                 
                 # in case of LGS sensor, convolve with LGS spots to create spot elungation
                 if self.is_LGS:
-                    I = np.fft.fftshift(np.abs((np.fft.ifft2(np.fft.fft2(I)*self.C))), axes=[1,2])
+                    I = np.fft.fftshift(np.abs((np.fft.ifft2(np.fft.fft2(I)*self.C))),axes = [1,2])
+
+                # Crop to get the spot at shannon sampling
+                if self.shannon_sampling:
+                    self.maps_intensity =  I[:,self.n_pix_subap//2:-self.n_pix_subap//2,self.n_pix_subap//2:-self.n_pix_subap//2]
+                    if self.binning_factor>1:
+                        self.maps_intensity =  bin_ndarray(self.maps_intensity,[self.maps_intensity.shape[0], self.n_pix_subap//self.binning_factor,self.n_pix_subap//self.binning_factor], operation='sum')
+                else:
+                    self.maps_intensity =  bin_ndarray(I,[I.shape[0], self.n_pix_subap//self.binning_factor,self.n_pix_subap//self.binning_factor], operation='sum')
 
                 # bin the 2D spots intensity to get the desired number of pixel per subaperture
-                self.maps_intensity =  bin_ndarray(I,[I.shape[0], self.n_pix_subap//self.binning_factor,self.n_pix_subap//self.binning_factor], operation='sum')
+                if self.binning_factor>1:
+                    self.maps_intensity =  bin_ndarray(self.maps_intensity,[self.maps_intensity.shape[0], self.n_pix_subap//self.binning_factor,self.n_pix_subap//self.binning_factor], operation='sum')
             
                 # add photon/readout noise to 2D spots
                 if self.cam.photonNoise != 0:
@@ -634,6 +631,23 @@ class ShackHartmann:
         #t_cpu = end_cpu - start_cpu
         #print('Time elapsed: ', t_cpu*1e3)
 
+    def print_properties(self):
+        print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% SHACK HARTMANN WFS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
+        print('{: ^20s}'.format('Subapertures')         + '{: ^18s}'.format(str(self.nSubap))                                   )
+        print('{: ^20s}'.format('Subaperture Size')     + '{: ^18s}'.format(str(np.round(self.telescope.D/self.nSubap,2)))      +'{: ^18s}'.format('[m]'   ))
+        print('{: ^20s}'.format('Pixel FoV')            + '{: ^18s}'.format(str(np.round(self.fov_pixel_binned_arcsec,2)))      +'{: ^18s}'.format('[arcsec]'   ))
+        print('{: ^20s}'.format('Subapertue FoV')       + '{: ^18s}'.format(str(np.round(self.fov_lenslet_arcsec,2)))           +'{: ^18s}'.format('[arcsec]'  ))
+        print('{: ^20s}'.format('Valid Subaperture')    + '{: ^18s}'.format(str(str(self.nValidSubaperture))))                   
+        print('{: ^20s}'.format('Binning Factor')    + '{: ^18s}'.format(str(str(self.binning_factor))))                   
+
+        if self.is_LGS:    
+            print('{: ^20s}'.format('Spot Elungation')    + '{: ^18s}'.format(str(100*np.round(self.elungation_factor,3)))      +'{: ^18s}'.format('% of a subap' ))
+        print('{: ^20s}'.format('Geometric WFS')    + '{: ^18s}'.format(str(self.is_geometric)))
+        print('{: ^20s}'.format('Shannon Sampling')    + '{: ^18s}'.format(str(self.shannon_sampling)))
+
+        print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')        
+        if self.is_geometric:
+            print('WARNING: THE PHOTON AND READOUT NOISE ARE NOT CONSIDERED FOR GEOMETRIC SH-WFS')
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% WFS PROPERTIES %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
     @property
