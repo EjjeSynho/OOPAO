@@ -31,7 +31,8 @@ from OOPAO.tools.displayTools import cl_plot, displayMap
 from parameter_files.parameterFile_VLT_SPHERE_SH_WFS import initializeParameterFile
 
 param = initializeParameterFile()
-# param['resolution'] = 320
+param['resolution'] = 320
+param['nPixelPerSubap'] = 8 
 param['opticalBand'] = 'R'
 param['magnitude'] = 8
 plt.ion()

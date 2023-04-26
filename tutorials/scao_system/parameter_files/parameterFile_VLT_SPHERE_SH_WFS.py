@@ -29,7 +29,7 @@ def initializeParameterFile():
     param['nSubaperture'        ] = 40                                             # number of PWFS subaperture along the telescope diameter
     param['nPixelPerSubap'      ] = 8                                              # sampling of the PWFS subapertures
     param['nPhotonPerSubaperture'] = 10
-    # param['resolution'          ] = param['nSubaperture']*param['nPixelPerSubap']  # resolution of the telescope driven by the PWFS
+    param['resolution'          ] = param['nSubaperture']*param['nPixelPerSubap']  # resolution of the telescope driven by the PWFS
     param['sizeSubaperture'     ] = param['diameter']/param['nSubaperture']        # size of a sub-aperture projected in the M1 space
     # param['samplingTime'        ] = 1 / param['loopFrequency']                     # loop sampling time in [s]
     param['samplingTime'        ] = 1 / 1000                                       # loop sampling time in [s]
