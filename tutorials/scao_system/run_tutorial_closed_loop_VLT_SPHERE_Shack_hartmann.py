@@ -1,9 +1,16 @@
-# -*- coding: utf-8 -*-
+#%% -*- coding: utf-8 -*-
+%reload_ext autoreload
+%autoreload 2
+
 """
 Created on Wed Oct 21 10:51:32 2020
 
 @author: cheritie
 """
+import sys
+sys.path.insert(0, '..')
+sys.path.insert(0, '../../')
+
 
 import time
 
@@ -19,8 +26,9 @@ from OOPAO.Telescope import Telescope
 from OOPAO.calibration.InteractionMatrix import InteractionMatrix
 from OOPAO.calibration.compute_KL_modal_basis import compute_M2C
 from OOPAO.tools.displayTools import cl_plot, displayMap
-# %% -----------------------     read parameter file   ----------------------------------
 from parameter_files.parameterFile_VLT_SPHERE_SH_WFS import initializeParameterFile
+
+# %% -----------------------     read parameter file   ----------------------------------
 
 param = initializeParameterFile()
 
@@ -46,8 +54,7 @@ plt.figure()
 plt.imshow(tel.pupilReflectivity)
 # %% -----------------------     NGS   ----------------------------------
 # create the Source object
-ngs = Source(optBand=param['opticalBand'], \
-             magnitude=param['magnitude'])
+ngs = Source(optBand=param['opticalBand WFS'], magnitude=param['magnitude WFS'])
 
 # combine the NGS to the telescope using '*' operator:
 ngs * tel
@@ -294,3 +301,5 @@ for i in range(param['nLoop']):
 
     print('Loop' + str(i) + '/' + str(param['nLoop']) + ' Turbulence: ' + str(total[i]) + ' -- Residual:' + str(
         residual[i]) + '\n')
+
+# %%

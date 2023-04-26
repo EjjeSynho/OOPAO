@@ -34,9 +34,9 @@ def initializeParameterFile():
     param['getProjector'        ] = True                                           # modal projector too get modal coefficients of the turbulence and residual phase
                                      
     ###%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% M1 PROPERTIES %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    param['diameter'            ] = 8#.2                                           # diameter in [m]
+    param['diameter'            ] = 8.2                                           # diameter in [m]
     param['nSubaperture'        ] = 40                                             # number of PWFS subaperture along the telescope diameter
-    param['nPixelPerSubap'      ] = 6                                              # sampling of the PWFS subapertures
+    param['nPixelPerSubap'      ] = 8                                              # sampling of the PWFS subapertures
     param['nPhotonPerSubaperture'] = 10
     param['resolution'          ] = param['nSubaperture']*param['nPixelPerSubap']  # resolution of the telescope driven by the PWFS
     param['sizeSubaperture'     ] = param['diameter']/param['nSubaperture']        # size of a sub-aperture projected in the M1 space
