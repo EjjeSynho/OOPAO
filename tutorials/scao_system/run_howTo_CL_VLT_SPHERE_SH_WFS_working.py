@@ -1,18 +1,14 @@
- #%% -*- coding: utf-8 -*-
+#%% -*- coding: utf-8 -*-
 %reload_ext autoreload
 %autoreload 2
 %matplotlib inline
 
 import sys
 sys.path.insert(0, '..')
-
-"""
-Created on Wed Oct 21 10:51:32 2020
-@author: cheritie
-"""
+sys.path.insert(0, '../..')
 
 import time
-
+import os
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -20,6 +16,8 @@ from OOPAO.Atmosphere import Atmosphere
 from OOPAO.DeformableMirror import DeformableMirror
 from OOPAO.MisRegistration import MisRegistration
 from OOPAO.ShackHartmann import ShackHartmann
+from OOPAO.Telescope import Telescope
+
 from OOPAO.Source import Source
 from OOPAO.Telescope import Telescope
 from OOPAO.calibration.InteractionMatrix import InteractionMatrix
@@ -299,3 +297,4 @@ for i in range(param['nLoop']):
 
     print('Loop' + str(i) + '/' + str(param['nLoop']) + ' Turbulence: ' + str(total[i]) + ' -- Residual:' + str(
         residual[i]) + '\n')
+# %%
