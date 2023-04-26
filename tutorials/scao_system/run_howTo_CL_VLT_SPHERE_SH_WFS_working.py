@@ -1,18 +1,14 @@
- #%% -*- coding: utf-8 -*-
+#%% -*- coding: utf-8 -*-
 %reload_ext autoreload
 %autoreload 2
 %matplotlib inline
 
 import sys
 sys.path.insert(0, '..')
-
-"""
-Created on Wed Oct 21 10:51:32 2020
-@author: cheritie
-"""
+sys.path.insert(0, '../..')
 
 import time
-
+import os
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -52,7 +48,8 @@ plt.figure()
 plt.imshow(tel.pupilReflectivity)
 # %% -----------------------     NGS   ----------------------------------
 # create the Source object
-ngs  = Source(optBand=param['opticalBand WFS'],    magnitude=param['magnitude WFS'])
+# ngs  = Source(optBand=param['opticalBand WFS'],    magnitude=param['magnitude WFS'])
+ngs = Source(optBand=param['opticalBand'], magnitude=param['magnitude'])
 
 # combine the NGS to the telescope using '*' operator:
 ngs * tel
@@ -172,7 +169,6 @@ plt.title('KL mode normalization projected on the DM')
 plt.show()
 
 # %%
-
 # wfs.is_geometric = False
 stroke = 1e-9
 # controlling 1000 modes
@@ -299,3 +295,4 @@ for i in range(param['nLoop']):
 
     print('Loop' + str(i) + '/' + str(param['nLoop']) + ' Turbulence: ' + str(total[i]) + ' -- Residual:' + str(
         residual[i]) + '\n')
+# %%
