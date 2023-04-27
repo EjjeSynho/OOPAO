@@ -208,21 +208,22 @@ class Atmosphere:
                  pupil_footprint[center_x-self.telescope.resolution//2:center_x+self.telescope.resolution//2,center_y-self.telescope.resolution//2:center_y+self.telescope.resolution//2 ] = 1
                  layer.pupil_footprint.append(pupil_footprint)   
         # layer pixel size
-        layer.d0            = layer.D/layer.resolution
+        layer.d0            = layer.D / layer.resolution
         
         # number of pixel for the phase screens computation
         layer.nExtra        = self.nExtra
         layer.nPixel        = int(1+np.round(layer.D/layer.d0))
         if compute_turbulence:
             print('-> Computing the initial phase screen...')  
-            a=time.time()
+            a = time.time()
             if self.mode == 2:
-                layer.phase         = ft_sh_phase_screen(self,layer.resolution,layer.D/layer.resolution,seed=i_layer)
+                layer.phase = ft_sh_phase_screen(self,layer.resolution,layer.D/layer.resolution,seed=i_layer)
             else: 
-                    layer.phase         = ft_phase_screen(self,layer.resolution,layer.D/layer.resolution,seed=i_layer)                    
+                layer.phase = ft_phase_screen(self,layer.resolution,layer.D/layer.resolution,seed=i_layer)     
+
             layer.initialPhase = layer.phase.copy()
             layer.seed = i_layer
-            b=time.time()
+            b = time.time()
             print('initial phase screen : ' +str(b-a) +' s')
             
             # Outer ring of pixel for the phase screens update 
@@ -533,7 +534,7 @@ class Atmosphere:
         
     def __mul__(self,obj):
         if obj.tag == 'telescope':
-            obj.optical_path =[[obj.src.type + '('+obj.src.optBand+')',id(obj.src)]]
+            obj.optical_path =[[obj.src.type+'({})'.format(obj.src.optBand), id(obj.src)]]
             obj.optical_path.append([self.tag,id(self)])
             obj.optical_path.append([obj.tag,id(obj)])
             obj.OPD          = self.OPD.copy()

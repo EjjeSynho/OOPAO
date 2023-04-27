@@ -233,7 +233,7 @@ atm = Atmosphere(telescope     = tel_vis,
                  fractionalR0  = param['fractionnalR0'],
                  windDirection = param['windDirection'],
                  altitude      = param['altitude'],
-                 param         = param)
+                 param         = None) #param)
 # initialize atmosphere
 atm.initializeAtmosphere(tel_vis)
 atm.update()
@@ -303,8 +303,8 @@ M2C = compute_M2C(telescope        = tel_vis, #M2C in theory for each r0, but wh
                   nmo              = 1000,
                   nZer             = 3,
                   remove_piston    = True,
-                  recompute_cov    = False) # forces to recompute covariance matrix
-                #   recompute_cov    = True) # forces to recompute covariance matrix
+                #   recompute_cov    = False) # forces to recompute covariance matrix
+                  recompute_cov    = True) # forces to recompute covariance matrix
 
 tel_vis.resetOPD()
 # project the mode on the DM
@@ -485,7 +485,6 @@ for i in range(param['nLoop']):
     # tel_IR_R.computePSF(zeroPaddingFactor=pixels_per_l_D_IR_R)
     t_end = time.perf_counter()
     print('FFT time:', str(np.round((t_end-t_start)*1e3).astype('int')), 'ms')
-    
     crop = slice(tel_IR_L.PSF_norma_zoom.shape[0]//2-64//2, tel_IR_L.PSF_norma_zoom.shape[1]//2+64//2)
 
     if i > 15:

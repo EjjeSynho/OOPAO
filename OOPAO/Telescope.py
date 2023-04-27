@@ -490,7 +490,7 @@ class Telescope:
     def resetOPD(self):
         # re-initialize the telescope OPD to a flat wavefront
         if self.src is not None:
-            self.optical_path = [[self.src.type + '('+self.src.optBand+')', id(self.src)]]
+            self.optical_path = [[self.src.type+'({})'.format(self.src.optBand), id(self.src)]]
             self.optical_path.append([self.tag,id(self)])
             if self.src.tag == 'asterism':
                 self.OPD = [self.pupil.astype(float) for i in range(self.src.n_source)]
@@ -616,7 +616,8 @@ class Telescope:
     # Combining with an atmosphere object
     def __add__(self,obj):
         if obj.tag == 'atmosphere':
-            self.optical_path =[[self.src.type + '('+self.src.optBand+')',id(self.src)]]
+            # self.optical_path =[[self.src.type + '('+self.src.optBand+')',id(self.src)]]
+            self.optical_path = [[self.src.type+'({})'.format(self.src.optBand), id(self.src)]]
             self.optical_path.append([obj.tag,id(obj)])
             self.optical_path.append([self.tag,id(self)])
             self.isPaired   = True
@@ -635,7 +636,7 @@ class Telescope:
     # Separating from an atmosphere object
     def __sub__(self,obj):
         if obj.tag == 'atmosphere':
-            self.optical_path =[[self.src.type + '('+self.src.optBand+')',id(self.src)]]
+            self.optical_path = [[self.src.type+'({})'.format(self.src.optBand), id(self.src)]]
             self.optical_path.append([self.tag,id(self)])
             self.isPaired   = False  
             self.resetOPD()   

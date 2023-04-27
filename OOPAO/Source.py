@@ -181,10 +181,10 @@ class Source:
         self.fluxMap    = telescope.pupilReflectivity*self.nPhoton*telescope.samplingTime*(telescope.D/telescope.resolution)**2
         if telescope.optical_path is None:
             telescope.optical_path = []
-            telescope.optical_path.append([self.type + '('+self.optBand+')',id(self)])
+            telescope.optical_path.append([self.type+'({})'.format(self.optBand), id(self)])
             telescope.optical_path.append([telescope.tag,id(telescope)])
         else:
-            telescope.optical_path[0] =[self.type + '('+self.optBand+')',id(self)]
+            telescope.optical_path[0] =[self.type+'({})'.format(self.optBand), id(self)]
             
         return telescope
      
