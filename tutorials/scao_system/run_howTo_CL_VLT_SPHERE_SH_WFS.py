@@ -94,7 +94,7 @@ param['sizeLenslet']           = config_file['sensor_HO']['SizeLenslets']
 param['readoutNoise']          = config_file['sensor_HO']['SigmaRON']
 param['loopFrequency']         = config_file['RTC']['SensorFrameRate_HO']
 param['gainCL']                = config_file['RTC']['LoopGain_HO']
-param['mechanicalCoupling']    = config_file['DM']['InfCoupling']
+# param['mechanicalCoupling']    = config_file['DM']['InfCoupling']
 param['detector gain']         = config_file['sensor_science']['Gain']
 
 # This is for real SPHERE
@@ -233,7 +233,7 @@ atm = Atmosphere(telescope     = tel_vis,
                  fractionalR0  = param['fractionnalR0'],
                  windDirection = param['windDirection'],
                  altitude      = param['altitude'],
-                 param         = None) #param)
+                 param         = param)
 # initialize atmosphere
 atm.initializeAtmosphere(tel_vis)
 atm.update()
@@ -303,8 +303,8 @@ M2C = compute_M2C(telescope        = tel_vis, #M2C in theory for each r0, but wh
                   nmo              = 1000,
                   nZer             = 3,
                   remove_piston    = True,
-                #   recompute_cov    = False) # forces to recompute covariance matrix
-                  recompute_cov    = True) # forces to recompute covariance matrix
+                  recompute_cov    = False) # forces to recompute covariance matrix
+                #   recompute_cov    = True) # forces to recompute covariance matrix
 
 tel_vis.resetOPD()
 # project the mode on the DM
@@ -346,17 +346,8 @@ calib_mat_path = param['pathInput']+'calib_KL_'+str(param['nModes'])+'.pickle'
 if not os.path.exists(calib_mat_path):
     print('Creating ', calib_mat_path, 'file...')
     stroke = 1e-9
-    # calib_KL = InteractionMatrix(ngs           = ngs,
-    #                              atm           = atm,
-    #                              tel           = tel,
-    #                              dm            = dm,
-    #                              wfs           = wfs,
-    #                              M2C           = M2C_KL,
-    #                              stroke        = stroke,
-    #                              nMeasurements = 200,
-    #                              noise         = 'off')
 
-    calib_KL_geo = InteractionMatrix(ngs          = ngs_vis,  #wavelength dependant --> different for different filter
+    calib_KL = InteractionMatrix(ngs          = ngs_vis,  #wavelength dependant --> different for different filter
                                     atm           = atm, #TODO: remove atm
                                     tel           = tel_vis,
                                     dm            = dm,
@@ -367,19 +358,19 @@ if not os.path.exists(calib_mat_path):
                                     noise         = 'off') #'on')
 
     with open(calib_mat_path, 'wb') as handle:
-        pickle.dump(calib_KL_geo.__dict__, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        pickle.dump(calib_KL.__dict__, handle, protocol=pickle.HIGHEST_PROTOCOL)
 else:
     print('Loading ', calib_mat_path, 'file...')
 
     from OOPAO.calibration.CalibrationVault import CalibrationVault
-    calib_KL_geo = CalibrationVault(0, invert=False)
+    calib_KL = CalibrationVault(0, invert=False)
 
     with open(calib_mat_path, 'rb') as handle:
-        calib_KL_geo.__dict__ = pickle.load(handle)
+        calib_KL.__dict__ = pickle.load(handle)
 
 
 plt.figure()
-plt.plot(np.std(calib_KL_geo.D, axis=0))
+plt.plot(np.std(calib_KL.D, axis=0))
 
 plt.xlabel('Mode Number')
 plt.ylabel('WFS slopes STD')
@@ -389,7 +380,7 @@ plt.ylabel('WFS slopes STD')
 # These are the calibration data used to close the loop
 wfs.is_geometric = param['is_geometric']
 
-calib_CL = calib_KL_geo
+calib_CL = calib_KL
 M2C_CL   = M2C_KL.copy()
 
 tel_vis.resetOPD()
@@ -408,7 +399,7 @@ tel_vis+atm
 
 # initialize DM commands
 dm.coefs = 0
-ngs_vis*tel_vis*dm*wfs
+ngs_vis * tel_vis * dm * wfs
 ngs_IR_R*tel_IR_R
 ngs_IR_L*tel_IR_L
 
@@ -458,6 +449,8 @@ plot_obj = cl_plot(list_fig          = [atm.OPD, tel_vis.mean_removed_OPD, wfs.c
                    list_ratio        = [[0.95,0.95,0.1], [1,1,1,1]], s=5)
 
 # fig = plt.figure(1)
+
+param['nLoop'] = np.ceil(1.0 / tel_vis.samplingTime).astype('uint')
 
 for i in range(param['nLoop']):
     # update phase screens => overwrite tel.OPD and consequently tel.src.phase

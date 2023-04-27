@@ -494,17 +494,17 @@ class DeformableMirror:
     @coefs.setter
     def coefs(self,val):
         if self.floating_precision==32:            
-            self._coefs=np.float32(val)
+            self._coefs = np.float32(val)
         else:
-            self._coefs=val
+            self._coefs = val
 
         if np.isscalar(val):
             if val==0:
                 self._coefs = np.zeros(self.nValidAct,dtype=np.float64)
                 try:
-                    self.OPD = np.float64(np.reshape(np.matmul(self.modes,self._coefs),[self.resolution,self.resolution]))
+                    self.OPD = np.float64(np.reshape(np.matmul(self.modes,self._coefs), [self.resolution,self.resolution]))
                 except:
-                    self.OPD = np.float64(np.reshape(self.modes@self._coefs,[self.resolution,self.resolution]))
+                    self.OPD = np.float64(np.reshape(self.modes @ self._coefs, [self.resolution,self.resolution]))
 
             else:
                 print('Error: wrong value for the coefficients')    
@@ -515,14 +515,14 @@ class DeformableMirror:
                     try:
                         self.OPD = np.float64(np.reshape(np.matmul(self.modes,self._coefs),[self.resolution,self.resolution]))
                     except:
-                        self.OPD = np.float64(np.reshape(self.modes@self._coefs,[self.resolution,self.resolution]))
+                        self.OPD = np.float64(np.reshape(self.modes @ self._coefs,[self.resolution,self.resolution]))
                         
 #                case of multiple modes at a time
                 else:
                     try:
-                        self.OPD =  np.float64(np.reshape(np.matmul(self.modes,self._coefs),[self.resolution,self.resolution,val.shape[1]]))                            
+                        self.OPD = np.float64(np.reshape(np.matmul(self.modes,self._coefs), [self.resolution,self.resolution,val.shape[1]]))                            
                     except:
-                        self.OPD =  np.float64(np.reshape(self.modes@self._coefs,[self.resolution,self.resolution,val.shape[1]]))
+                        self.OPD = np.float64(np.reshape(self.modes @ self._coefs, [self.resolution, self.resolution, val.shape[1]]))
 
             else:
                 print('Error: wrong value for the coefficients')    
