@@ -24,36 +24,32 @@ import pickle
 from pprint import pprint
 
 from parameter_files.parameterFile_VLT_SPHERE_SH_WFS import initializeParameterFile
+from data_processing.SPHERE_data import LoadSPHEREsampleByID
+from tools.config_manager import ConfigManager, GetSPHEREonsky
+from tools.parameter_parser import ParameterParser
+from tools.utils import r0, deg2rad, seeing
 
-# plt.ion()
 
 #%%
 with open('E:/ESO/Data/SPHERE/sphere_df.pickle', 'rb') as handle:
     psf_df = pickle.load(handle)
 
 psf_df = psf_df[psf_df['invalid'] == False]
+# psf_df = psf_df[psf_df['Wind speed (200 mbar)'].notna()]
 psf_df = psf_df[psf_df['Class A'] == True]
-# psf_df = psf_df[np.isfinite(psf_df['λ left (nm)']) < 1700]
+psf_df = psf_df[np.isfinite(psf_df['λ left (nm)']) < 1700]
 psf_df = psf_df[psf_df['Δλ left (nm)'] < 80]
-psf_df = psf_df[psf_df['mag J'] < 9]
-psf_df = psf_df[psf_df['Nph WFS'] > 100]
-
+# psf_df = psf_df[psf_df['mag J'] < 10]
+# psf_df = psf_df[psf_df['Nph WFS'] > 100]
 good_ids = psf_df.index.values.tolist()
 
 #%%
-# sys.path.append(os.path.abspath('C:/Users/akuznets/Projects/TipToy/'))
-# sys.path.append(os.path.abspath('C:/Users/akuznets/Projects/TipToy/tools/'))
-# sys.path.append(os.path.abspath('C:/Users/akuznets/Projects/TipToy/parameter_parser/'))
-
-from data_processing.SPHERE_data import LoadSPHEREsampleByID
-from tools.config_manager import ConfigManager, GetSPHEREonsky
-from tools.parameter_parser import ParameterParser
-from tools.utils import r0, deg2rad, seeing
-
 # id_real = 465
 # id_real = 576
 # id_real = 719
 id_real = 992
+
+precomputed = False
 
 data_sample = LoadSPHEREsampleByID(id_real)
 
@@ -77,7 +73,6 @@ param = initializeParameterFile()
 # param['magnitude WFS'    ]     = target_magnitude
 # param['magnitude science']     = IR_magnitude
 
-
 param['pupil path']            = config_file['telescope']['PathPupil']
 param['apodizer path']         = config_file['telescope']['PathApodizer']
 param['diameter']              = config_file['telescope']['TelescopeDiameter']
@@ -87,6 +82,7 @@ param['opticalBand WFS']       = config_file['sources_HO']['Wavelength']
 param['windSpeed']             = config_file['atmosphere']['WindSpeed']
 param['wavelength (left)']     = config_file['sources_science']['Wavelength']['central L'] * 1e-9
 param['wavelength (right)']    = config_file['sources_science']['Wavelength']['central R'] * 1e-9
+param['opticalBand WFS']       = config_file['sources_HO']['Wavelength']
 param['pixel scale']           = config_file['sensor_science']['PixelScale']
 param['nSubaperture']          = config_file['sensor_HO']['NumberLenslets']
 param['nPhotonPerSubaperture'] = config_file['sensor_HO']['NumberPhotons']
@@ -95,6 +91,7 @@ param['readoutNoise']          = config_file['sensor_HO']['SigmaRON']
 param['loopFrequency']         = config_file['RTC']['SensorFrameRate_HO']
 param['gainCL']                = config_file['RTC']['LoopGain_HO']
 # param['mechanicalCoupling']    = config_file['DM']['InfCoupling']
+param['pitch']                 = config_file['DM']['DmPitchs']
 param['detector gain']         = config_file['sensor_science']['Gain']
 
 # This is for real SPHERE
@@ -187,10 +184,23 @@ def magnitudeFromPhotons(tel, photons, band, sampling_time):
     nPhoton = np.nansum(fluxMap / tel.pupilReflectivity) / (np.pi*(tel.D/2)**2) / sampling_time
     return -2.5 * np.log10(368 * nPhoton / zero_point )
 
-photometry = Photometry()
-vis_band = photometry(param['opticalBand WFS'])
+def TruePhotonsFromMag(tel, mag, band, sampling_time): # [photons/aperture] !not per m2!
+    c = tel.pupilReflectivity * np.pi*(tel.D/2)**2*sampling_time
+    return Photometry()(band)[2]/368 * 10**(-mag/2.5) * c
 
-SAXO_mag = magnitudeFromPhotons(tel_vis, flux_per_frame, vis_band, 1/param['loopFrequency'])
+
+bands = ['mag V', 'mag R', 'mag G', 'mag J', 'mag H', 'mag K']
+
+mags = [psf_df.loc[id_real][mag] for mag in bands]
+
+R_mag = mags[bands.index('mag R')]
+
+# photons = [TruePhotonsFromMag(tel_vis, mag, band[-1], param['samplingTime']) for mag, band in zip(mags, bands)]
+
+#%%
+vis_band = Photometry()(param['opticalBand WFS'])
+
+SAXO_mag = magnitudeFromPhotons(tel_vis, flux_per_frame, vis_band, 1./param['loopFrequency'])
 
 param['magnitude WFS'] = SAXO_mag
 param['magnitude science'] = SAXO_mag #TODO: fix it
@@ -201,9 +211,9 @@ ngs_IR_R = Source(optBand=param['wavelength (right)'], magnitude=param['magnitud
 
 ngs_IR_R.nPhoton = ngs_IR_L.nPhoton
 
-pixels_per_l_D_vis  = ngs_vis.wavelength*rad2mas  / param['pixel scale'] / param['diameter']
-pixels_per_l_D_IR_L = ngs_IR_L.wavelength*rad2mas / param['pixel scale'] / param['diameter']
-pixels_per_l_D_IR_R = ngs_IR_R.wavelength*rad2mas / param['pixel scale'] / param['diameter']
+pixels_per_l_D_vis  = ngs_vis.wavelength  * rad2mas / param['pixel scale'] / param['diameter']
+pixels_per_l_D_IR_L = ngs_IR_L.wavelength * rad2mas / param['pixel scale'] / param['diameter']
+pixels_per_l_D_IR_R = ngs_IR_R.wavelength * rad2mas / param['pixel scale'] / param['diameter']
 
 # combine the NGS to the telescope using '*' operator:
 ngs_vis  * tel_vis
@@ -224,6 +234,7 @@ plt.xlabel('[Arcsec]')
 plt.ylabel('[Arcsec]')
 
 
+
 #%% -----------------------     ATMOSPHERE   ----------------------------------
 # create the Atmosphere object
 atm = Atmosphere(telescope     = tel_vis,
@@ -233,13 +244,14 @@ atm = Atmosphere(telescope     = tel_vis,
                  fractionalR0  = param['fractionnalR0'],
                  windDirection = param['windDirection'],
                  altitude      = param['altitude'],
-                 param         = param)
+                 param         = param if precomputed else None)
+
 # initialize atmosphere
 atm.initializeAtmosphere(tel_vis)
 atm.update()
 
 plt.figure()
-plt.imshow(atm.OPD*1e9)
+plt.imshow(atm.OPD * 1e9)
 plt.title('OPD Turbulence [nm]')
 plt.colorbar()
 
@@ -260,23 +272,26 @@ misReg = MisRegistration(param)
 dm = DeformableMirror(telescope    = tel_vis,
                       nSubap       = param['nSubaperture'],
                       mechCoupling = param['mechanicalCoupling'],
+                      pitch        = param['pitch'],
                       misReg       = misReg)
 
 plt.figure()
-plt.plot(dm.coordinates[:,0], dm.coordinates[:,1],'x')
+plt.plot(dm.coordinates[:,0], dm.coordinates[:,1], 'x')
 plt.xlabel('[m]')
 plt.ylabel('[m]')
 plt.title('DM Actuator Coordinates')
 
 #%% -----------------------     SH WFS   ----------------------------------
 # make sure tel and atm are separated to initialize the PWFS
+from OOPAO.ShackHartmann import ShackHartmann
+
 tel_vis-atm
 
 wfs = ShackHartmann(nSubap       = param['nSubaperture'],
                     telescope    = tel_vis,
                     lightRatio   = param['lightThreshold'],
                     is_geometric = param['is_geometric'])
-tel_vis*wfs
+tel_vis * wfs
 plt.close('all')
 
 plt.figure()
@@ -303,8 +318,7 @@ M2C = compute_M2C(telescope        = tel_vis, #M2C in theory for each r0, but wh
                   nmo              = 1000,
                   nZer             = 3,
                   remove_piston    = True,
-                  recompute_cov    = False) # forces to recompute covariance matrix
-                #   recompute_cov    = True) # forces to recompute covariance matrix
+                  recompute_cov    = False if precomputed else True) # forces to recompute covariance matrix
 
 tel_vis.resetOPD()
 # project the mode on the DM
@@ -341,21 +355,21 @@ M2C_KL = np.asarray(M2C[:,:param['nModes']])
 
 import os
 
-calib_mat_path = param['pathInput']+'calib_KL_'+str(param['nModes'])+'.pickle'
+calib_mat_path = param['pathInput'] + 'calib_KL_' + str(param['nModes']) + '.pickle'
 
-if not os.path.exists(calib_mat_path):
+if not os.path.exists(calib_mat_path) or not precomputed:
     print('Creating ', calib_mat_path, 'file...')
     stroke = 1e-9
 
-    calib_KL = InteractionMatrix(ngs          = ngs_vis,  #wavelength dependant --> different for different filter
-                                    atm           = atm, #TODO: remove atm
-                                    tel           = tel_vis,
-                                    dm            = dm,
-                                    wfs           = wfs,
-                                    M2C           = M2C_KL,
-                                    stroke        = stroke,
-                                    nMeasurements = 200,
-                                    noise         = 'off') #'on')
+    calib_KL = InteractionMatrix(ngs           = ngs_vis,  #wavelength dependant --> different for different filter
+                                 atm           = atm, #TODO: remove atm
+                                 tel           = tel_vis,
+                                 dm            = dm,
+                                 wfs           = wfs,
+                                 M2C           = M2C_KL,
+                                 stroke        = stroke,
+                                 nMeasurements = 200,
+                                 noise         = 'off') #'on')
 
     with open(calib_mat_path, 'wb') as handle:
         pickle.dump(calib_KL.__dict__, handle, protocol=pickle.HIGHEST_PROTOCOL)
@@ -450,8 +464,6 @@ plot_obj = cl_plot(list_fig          = [atm.OPD, tel_vis.mean_removed_OPD, wfs.c
 
 # fig = plt.figure(1)
 
-param['nLoop'] = np.ceil(1.0 / tel_vis.samplingTime).astype('uint')
-
 for i in range(param['nLoop']):
     # update phase screens => overwrite tel.OPD and consequently tel.src.phase
     t_start = time.perf_counter()
@@ -510,15 +522,14 @@ for i in range(param['nLoop']):
 #%%
 from tqdm import tqdm
 
-param['nLoop'] = np.ceil(param['loopFrequency']).astype(np.uint16)
-N_DITs = 10
-param['nLoop'] = param['nLoop'] // N_DITs * N_DITs
+NDITs = 3
+
+param['nLoop'] = param['nLoop'] = np.ceil(1.0 / tel_vis.samplingTime).astype('uint') * NDITs
 
 WFS_signals   = np.zeros([wfs.signal.shape[0], param['nLoop']], dtype=np.float32)
 OPD_turbulent = np.zeros([tel_vis.pupil.shape[0], tel_vis.pupil.shape[1], param['nLoop']], dtype=np.float32)
 OPD_residual  = np.zeros([tel_vis.pupil.shape[0], tel_vis.pupil.shape[1], param['nLoop']], dtype=np.float32)
 n_phs = np.zeros([param['nLoop']], dtype=np.float32)
-OPDs_over_pupil = np.zeros(param['nLoop'])
 
 t_start = time.perf_counter()
 for i in tqdm(range(param['nLoop'])):
@@ -533,10 +544,9 @@ for i in tqdm(range(param['nLoop'])):
     # store the slopes after computing the commands => 2 frames delay
     WFS_signals[:,i]    = np.copy(wfs.signal)
     OPD_residual[:,:,i] = np.copy(tel_vis.OPD_no_pupil)
-    OPDs_over_pupil[i]  = np.std(OPD_residual[:,:,i][np.where(tel_vis.pupil > 0)])
     n_phs[i] = np.median(wfs.photon_per_subaperture_2D[(wfs.validLenslets_x, wfs.validLenslets_y)])
-
     #print('Loop '+str(i)+'/'+str(param['nLoop'])+' -- turbulence: '+str(np.round(total[i],1))+', residual: ' +str(np.round(residual[i],1))+ '\n')
+
 t_end = time.perf_counter()
 print('Elapsed time:', str(np.round((t_end-t_start)*1e3).astype('int')), 'ms')
 
@@ -569,15 +579,36 @@ def ComputeLongExposure(OPD_residual, tel, pix_per_l_D):
     print('Elapsed time:', str(np.round((t_end-t_start)*1e3).astype('int')), 'ms')
     del EMF_chunk
     long_exposure = PSFs_stack.mean(axis=2)
-    DITs = np.stack( np.split(PSFs_stack, N_DITs, axis=2) ).mean(axis=-1)
     variance = PSFs_stack.var(axis=2) #TODO: make noisy
     del PSFs_stack
-    return long_exposure, variance, DITs
+    return long_exposure, variance
 
-# Make it one second
-# Make it multiple DITs
-PSF_long_exposure_L, PSF_variance_L, DITs_L = ComputeLongExposure(OPD_residual, tel_IR_L, pixels_per_l_D_IR_L)
-PSF_long_exposure_R, PSF_variance_R, DITs_R = ComputeLongExposure(OPD_residual, tel_IR_R, pixels_per_l_D_IR_R)
+# PSF_long_exposure_L, PSF_variance_L = ComputeLongExposure(OPD_residual, tel_IR_L, pixels_per_l_D_IR_L)
+# PSF_long_exposure_R, PSF_variance_R = ComputeLongExposure(OPD_residual, tel_IR_R, pixels_per_l_D_IR_R)
+# DITs_L = np.split(PSF_long_exposure_L, NDITs)
+# DITs_R = np.split(PSF_long_exposure_R, NDITs)
+
+DITs_L = []
+DITs_R = []
+DITs_L_var = []
+DITs_R_var = []
+
+chunck_size = OPD_residual.shape[2] // NDITs
+
+for i in tqdm(range(NDITs)):
+    PSF_LE_L, PSF_LE_L_var = ComputeLongExposure(OPD_residual[:,:,i*chunck_size:(i+1)*chunck_size], tel_IR_L, pixels_per_l_D_IR_L)
+    PSF_LE_R, PSF_LE_R_var = ComputeLongExposure(OPD_residual[:,:,i*chunck_size:(i+1)*chunck_size], tel_IR_R, pixels_per_l_D_IR_R)
+
+    DITs_L.append(PSF_LE_L)
+    DITs_R.append(PSF_LE_R)
+    DITs_L_var.append(PSF_LE_L_var)
+    DITs_R_var.append(PSF_LE_R_var)
+
+DITs_L = np.stack(DITs_L)
+DITs_R = np.stack(DITs_R)
+DITs_L_var = np.stack(DITs_L_var)
+DITs_R_var = np.stack(DITs_R_var)
+
 
 #%%
 plt.figure()
@@ -593,21 +624,12 @@ test = np.hstack((
     np.abs(PSF_long_exposure_L[el_croppo(crop)] - PSF_long_exposure_R[el_croppo(crop)])
 ))
 
-
 plt.imshow(np.log(test))
 # plt.imshow(test)
 # plt.imshow(np.log(test2))
 # plt.colorbar()
 plt.show()
 
-#%%
-PSF_0 = np.copy(data_sample['image'])[el_croppo(crop)]
-PSF_2 = np.copy(long_exposure)[el_croppo(crop)]
-PSF_0 /= PSF_0.sum()
-PSF_2 /= PSF_2.sum()
-
-plt.imshow(np.log(np.abs(np.hstack((PSF_0, PSF_2, PSF_2-PSF_0)))))
-plt.show()
 
 #%%
 # simulation_result = np.save('C:/Users/akuznets/Data/SPHERE/PSF_OOPAO.npy', long_exposure[el_croppo(256)]/long_exposure[el_croppo(256)].sum())
@@ -640,10 +662,10 @@ def ComputePSDfromScreens(screens):
     return PSD
 
 # PSD_residuals = ComputePSDfromScreens(OPD_residual)
-circa = mask_circle(OPD_residual.shape[0], OPD_residual.shape[0]//2)
+circ_pupil = mask_circle(OPD_residual.shape[0], OPD_residual.shape[0]//2) - mask_circle(OPD_residual.shape[0], OPD_residual.shape[0]//2 / 8*1.12)
 
-PSD_turbulent = binning(ComputePSDfromScreens(OPD_turbulent * circa[...,None]), 2, 'mean')
-PSD_residuals = binning(ComputePSDfromScreens(OPD_residual  * circa[...,None]), 2, 'mean')
+PSD_turbulent = binning(ComputePSDfromScreens(OPD_turbulent * circ_pupil[...,None]), 2, 'mean')
+PSD_residuals = binning(ComputePSDfromScreens(OPD_residual  * circ_pupil[...,None]), 2, 'mean')
 
 #%%
 def radial_profile(data, center):
@@ -715,7 +737,7 @@ for i in tqdm(range(N_slopes)):
 autocorrs = np.array(autocorrs).mean(axis=0) / N_steps
 autocorrs = autocorrs[np.argmax(autocorrs) : np.argmax(autocorrs)+20]
 
-#%%
+#%
 poisson  = lambda x, lmbd, height, b, a: height * lmbd**(x/a) / factorial(x/a) * np.exp(-lmbd) + b
 dt = np.arange(1, len(autocorrs))
 
@@ -780,7 +802,8 @@ def GetWFSnoiseError(slopes, display=False):
 print(GetWFSnoiseError(WFS_signals))
 
 residual_err = np.zeros([OPD_residual.shape[2]])
-SR = np.zeros([OPD_residual.shape[2]])
+SR_H = np.zeros([OPD_residual.shape[2]])
+SR_R = np.zeros([OPD_residual.shape[2]])
 
 for i in range(OPD_residual.shape[2]):
     OPD = OPD_residual[:,:,i][np.where(tel_vis.pupil > 0)]
@@ -788,11 +811,14 @@ for i in range(OPD_residual.shape[2]):
     # SR[i] = np.exp(-np.var(phase_vis))
     phase_IR_L = 2*np.pi/tel_IR_L.src.wavelength * OPD #TODO: clarify from which tel SR should be computer
     phase_IR_R = 2*np.pi/tel_IR_R.src.wavelength * OPD
-    SR[i] = np.exp(-np.var(phase_IR_L)) * 0.5 + np.exp(-np.var(phase_IR_R)) * 0.5
+    phase_vis  = 2*np.pi/tel_vis.src.wavelength * OPD
+    SR_H[i] = np.exp(-np.var(phase_IR_L)) * 0.5 + np.exp(-np.var(phase_IR_R)) * 0.5
+    SR_R[i] = np.exp(-np.var(phase_vis))
     residual_err[i] = np.std(OPD)*1e9
 
 residual_err = residual_err.mean()
-SR = SR.mean()
+SR_H = SR_H.mean()
+SR_R = SR_R.mean()
 
 # wfsSignals
 # OPDs
@@ -867,11 +893,13 @@ data_write = {
 
     'observation': {
         'magnitudes': {
-            'V': SAXO_mag,
+            'IRDIS L': ngs_IR_L.magnitude,
+            'IRDIS R': ngs_IR_R.magnitude
         }
     },
 
-    'Strehl': SR,
+    'Strehl (IRDIS)': SR_H,
+    'Strehl (SAXO)': SR_R,
     'Wind speed': param['windSpeed'],
     'Wind direction': param['windDirection'],
 
@@ -884,7 +912,8 @@ data_write = {
     'WFS': {
         'Nph vis': n_phs.mean(),
         'rate': param['loopFrequency'],
-        'commands': WFS_signals
+        'commands': WFS_signals,
+        'wavelegnth': ngs_vis.wavelength
     },
 
     'telescope': {
@@ -897,8 +926,8 @@ data_write = {
     'PSF L': DITs_L,
     'PSF R': DITs_R,
 
-    'PSF L (variance)': PSF_variance_L,
-    'PSF R (variance)': PSF_variance_R,
+    'PSF L (variance)': DITs_L_var,
+    'PSF R (variance)': DITs_R_var,
 
     'PSD residuals': PSD_residuals,
     'PSD atmospheric': PSD_turbulent

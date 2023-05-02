@@ -4,9 +4,8 @@ Created on Thu May 20 17:52:09 2021
 @author: cheritie
 """
 
-import inspect
 import time
-
+import inspect
 import numpy as np
 
 from .Detector import Detector
@@ -172,8 +171,10 @@ class ShackHartmann:
                 self.index_y.append(j)
 
         self.current_nPhoton = self.telescope.src.nPhoton
-        self.index_x = np.asarray(self.index_x)
-        self.index_y = np.asarray(self.index_y)
+        # self.index_x = np.asarray(self.index_x)
+        # self.index_y = np.asarray(self.index_y)
+        self.index_x = np.array(self.index_x)
+        self.index_y = np.array(self.index_y)
         
         self.wfs_frame_buffer = np.zeros([self.index_x.shape[0], self.n_pix_subap, self.n_pix_subap])
 
@@ -200,8 +201,8 @@ class ShackHartmann:
     def initialize_wfs(self):
         self.isInitialized = False
 
-        readoutNoise = np.copy(self.cam.readoutNoise)
-        photonNoise  = np.copy(self.cam.photonNoise)
+        readoutNoise = self.cam.readoutNoise + 0
+        photonNoise  = self.cam.photonNoise + 0 #to make sure these variables are copied
         
         self.cam.photonNoise  = 0
         self.cam.readoutNoise = 0       
@@ -281,7 +282,7 @@ class ShackHartmann:
         if self.telescope.tag != 'asterism':
             if input_flux_map is None:
                 input_flux_map = self.telescope.src.fluxMap.T
-            
+
             tmp_flux_h_split = np.hsplit(input_flux_map, self.nSubap)
             self.cube_flux   = np.zeros([self.nSubap**2, self.n_pix_lenslet_init, self.n_pix_lenslet_init], dtype=float)
             
@@ -292,7 +293,8 @@ class ShackHartmann:
                     self.center_init - self.n_pix_subap_init//2 : self.center_init+self.n_pix_subap_init//2
                 ] = np.asarray(tmp_flux_v_split)
             
-            self.photon_per_subaperture = np.apply_over_axes(np.sum, self.cube_flux, [1,2])
+            # self.photon_per_subaperture = np.apply_over_axes(np.sum, self.cube_flux, [1,2])
+            self.photon_per_subaperture = self.cube_flux.sum(axis=(1,2), keepdims=True)
             self.current_nPhoton = self.telescope.src.nPhoton
         return
     
