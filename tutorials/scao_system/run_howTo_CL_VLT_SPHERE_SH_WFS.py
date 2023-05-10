@@ -1,7 +1,7 @@
 #%% -*- coding: utf-8 -*-
-%reload_ext autoreload
-%autoreload 2
-%matplotlib inline
+# %reload_ext autoreload
+# %autoreload 2
+# %matplotlib inline
 
 import sys
 sys.path.insert(0, '..')
@@ -39,16 +39,17 @@ psf_df = psf_df[psf_df['invalid'] == False]
 psf_df = psf_df[psf_df['Class A'] == True]
 psf_df = psf_df[np.isfinite(psf_df['λ left (nm)']) < 1700]
 psf_df = psf_df[psf_df['Δλ left (nm)'] < 80]
+psf_df = psf_df[psf_df['DIT Time'] < 1.0]
+psf_df = psf_df[psf_df['Num. DITs'] <= 20]
 # psf_df = psf_df[psf_df['mag J'] < 10]
 # psf_df = psf_df[psf_df['Nph WFS'] > 100]
 good_ids = psf_df.index.values.tolist()
 
 #%%
-# id_real = 465
+# id_real = 1209
 # id_real = 576
 # id_real = 719
 id_real = 992
-
 precomputed = False
 
 data_sample = LoadSPHEREsampleByID(id_real)
@@ -90,9 +91,11 @@ param['sizeLenslet']           = config_file['sensor_HO']['SizeLenslets']
 param['readoutNoise']          = config_file['sensor_HO']['SigmaRON']
 param['loopFrequency']         = config_file['RTC']['SensorFrameRate_HO']
 param['gainCL']                = config_file['RTC']['LoopGain_HO']
-# param['mechanicalCoupling']    = config_file['DM']['InfCoupling']
+param['mechanicalCoupling']    = config_file['DM']['InfCoupling']
 param['pitch']                 = config_file['DM']['DmPitchs']
 param['detector gain']         = config_file['sensor_science']['Gain']
+param['DIT']                   = data_sample['Integration']['DIT']
+param['NDIT']                  = data_sample['Integration']['Num. DITs']
 
 # This is for real SPHERE
 param['WFS_pixelScale'] = config_file['sensor_HO']['PixelScale'] # in [mas]
@@ -281,6 +284,8 @@ plt.xlabel('[m]')
 plt.ylabel('[m]')
 plt.title('DM Actuator Coordinates')
 
+plt.figure(), plt.imshow(np.sum(dm.modes,1).reshape(tel_vis.pupil.shape))
+
 #%% -----------------------     SH WFS   ----------------------------------
 # make sure tel and atm are separated to initialize the PWFS
 from OOPAO.ShackHartmann import ShackHartmann
@@ -362,7 +367,7 @@ if not os.path.exists(calib_mat_path) or not precomputed:
     stroke = 1e-9
 
     calib_KL = InteractionMatrix(ngs           = ngs_vis,  #wavelength dependant --> different for different filter
-                                 atm           = atm, #TODO: remove atm
+                                 atm           = atm, #TODO: remove atm, it's not used
                                  tel           = tel_vis,
                                  dm            = dm,
                                  wfs           = wfs,
@@ -432,8 +437,8 @@ LE_PSF_L  = np.log10(tel_vis.PSF_norma_zoom)
 
 # loop parameters
 gainCL = param['gainCL']
-wfs.cam.readoutNoise = 0.0 #param['readoutNoise']
-wfs.cam.photonNoise  = False #True
+wfs.cam.readoutNoise = param['readoutNoise'] #0.0
+wfs.cam.photonNoise  = True #False
 
 # Returns a gaussian function with the given parameters
 def gaussian(N, height, center_x, center_y, width_x, width_y):
@@ -441,6 +446,7 @@ def gaussian(N, height, center_x, center_y, width_x, width_y):
     return gauss_2d(*(np.indices(([N,N])))-(N/2-0.5))
 
 wfs.cog_weight = np.atleast_3d(gaussian(wfs.n_pix_subap, 1, 0, 0, 4, 4)).transpose([2,0,1]) #TODO: account for the reference slopes
+# wfs.cog_weight = wfs.cog_weight  * 0 + 1
 wfs.threshold_cog = 3*wfs.cam.readoutNoise
 
 reconstructor = M2C_CL @ calib_CL.M
@@ -479,8 +485,6 @@ for i in range(param['nLoop']):
     wfsSignal = wfs.signal
     t_end = time.perf_counter()
     print('Elapseed time:', str(np.round((t_end-t_start)*1e3).astype('int')), 'ms')
-    
-    #print(wfs.photon_per_subaperture)
 
     # update displays if required
     tel_IR_L.OPD = tel_vis.OPD_no_pupil * tel_IR_L.pupil
@@ -522,17 +526,19 @@ for i in range(param['nLoop']):
 #%%
 from tqdm import tqdm
 
-NDITs = 3
+NDITs = param['NDIT']
+param['nLoop'] = param['nLoop'] = np.ceil(param['DIT'] / tel_vis.samplingTime).astype('uint') * NDITs
 
-param['nLoop'] = param['nLoop'] = np.ceil(1.0 / tel_vis.samplingTime).astype('uint') * NDITs
+margin = 10 # First 10 frames are not recorded (while the loop is still open)
 
-WFS_signals   = np.zeros([wfs.signal.shape[0], param['nLoop']], dtype=np.float32)
-OPD_turbulent = np.zeros([tel_vis.pupil.shape[0], tel_vis.pupil.shape[1], param['nLoop']], dtype=np.float32)
-OPD_residual  = np.zeros([tel_vis.pupil.shape[0], tel_vis.pupil.shape[1], param['nLoop']], dtype=np.float32)
-n_phs = np.zeros([param['nLoop']], dtype=np.float32)
+WFS_signals   = np.zeros([wfs.signal.shape[0], param['nLoop']+margin], dtype=np.float32)
+OPD_turbulent = np.zeros([tel_vis.pupil.shape[0], tel_vis.pupil.shape[1], param['nLoop']+margin], dtype=np.float32)
+OPD_residual  = np.zeros([tel_vis.pupil.shape[0], tel_vis.pupil.shape[1], param['nLoop']+margin], dtype=np.float32)
+n_phs         = np.zeros([param['nLoop']+margin], dtype=np.float32)
+
 
 t_start = time.perf_counter()
-for i in tqdm(range(param['nLoop'])):
+for i in tqdm(range(param['nLoop']+margin)):
     # update phase screens => overwrite tel.OPD and consequently tel.src.phase
     atm.update()
     # save turbulent phase
@@ -547,10 +553,14 @@ for i in tqdm(range(param['nLoop'])):
     n_phs[i] = np.median(wfs.photon_per_subaperture_2D[(wfs.validLenslets_x, wfs.validLenslets_y)])
     #print('Loop '+str(i)+'/'+str(param['nLoop'])+' -- turbulence: '+str(np.round(total[i],1))+', residual: ' +str(np.round(residual[i],1))+ '\n')
 
+OPD_turbulent = OPD_turbulent[...,margin:]
+WFS_signals = WFS_signals[...,margin:]
+OPD_residual = OPD_residual[...,margin:]
+n_phs = n_phs[margin:]
+
 t_end = time.perf_counter()
 print('Elapsed time:', str(np.round((t_end-t_start)*1e3).astype('int')), 'ms')
 
-# TODO: cut first 20 samples to reach the convergence!
 
 #%%
 # Binning is used to downsample phase screens to reduce the computation time
@@ -583,10 +593,6 @@ def ComputeLongExposure(OPD_residual, tel, pix_per_l_D):
     del PSFs_stack
     return long_exposure, variance
 
-# PSF_long_exposure_L, PSF_variance_L = ComputeLongExposure(OPD_residual, tel_IR_L, pixels_per_l_D_IR_L)
-# PSF_long_exposure_R, PSF_variance_R = ComputeLongExposure(OPD_residual, tel_IR_R, pixels_per_l_D_IR_R)
-# DITs_L = np.split(PSF_long_exposure_L, NDITs)
-# DITs_R = np.split(PSF_long_exposure_R, NDITs)
 
 DITs_L = []
 DITs_R = []
@@ -647,25 +653,43 @@ def mask_circle(N, r, center=(0,0), centered=True):
     return pupil_round
 
 
-def ComputePSDfromScreens(screens):
-    print('Computing FFTs of each phase screen and spectra...')
-    spectra = np.zeros([screens.shape[0]*2, screens.shape[1]*2, screens.shape[2]], dtype=np.float32)
-    screens_zp = np.zeros([screens.shape[0]*2, screens.shape[1]*2, screens.shape[2]], dtype=np.float32)
+def ComputePSDfromScreens(phase_screens, chunk_size=None):
+    def ComputeSpectrumChunk(screens):
+        spectra    = np.zeros([screens.shape[0]*2, screens.shape[1]*2, screens.shape[2]], dtype=np.float32)
+        screens_zp = np.zeros([screens.shape[0]*2, screens.shape[1]*2, screens.shape[2]], dtype=np.float32)
 
-    insert_ids = slice(screens.shape[0]//2, screens.shape[0]//2+screens.shape[0])
-    screens_zp[insert_ids, insert_ids, :] = screens #* np.atleast_3d(tel_vis.pupil) # zero padding
-    spectra = np.abs(np.fft.fftshift( 1/spectra.shape[0] * np.fft.fft2(np.fft.fftshift(screens_zp), axes=(0,1)) ))
-    del screens_zp
-    print('Done!\nComputing PSD...')
-    PSD = spectra.var(axis=2)
-    del spectra
+        insert_ids = slice(screens.shape[0]//2, screens.shape[0]//2+screens.shape[0])
+        screens_zp[insert_ids, insert_ids, :] = screens #* np.atleast_3d(tel_vis.pupil) # zero padding
+        spectra = np.abs(np.fft.fftshift( 1/spectra.shape[0] * np.fft.fft2(np.fft.fftshift(screens_zp), axes=(0,1)) ))
+        del screens_zp, insert_ids
+        return spectra
+    
+    if chunck_size is None:
+        spectra = ComputeSpectrumChunk(phase_screens)
+        PSD = spectra.var(axis=2)
+        del spectra
+    else:
+        num_screens = phase_screens.shape[2]
+        PSDs = []
+        for d in tqdm(range(0, num_screens, chunk_size)):
+            chunk_end = min(d+chunk_size, num_screens)
+            spectra_buf = ComputeSpectrumChunk(phase_screens[:, :, d:chunk_end])
+            PSDs.append(spectra_buf.var(axis=2))
+            del spectra_buf
+        PSDs = np.dstack(PSDs)
+        PSD = PSDs.mean(axis=2)
+        del PSDs
     return PSD
 
-# PSD_residuals = ComputePSDfromScreens(OPD_residual)
-circ_pupil = mask_circle(OPD_residual.shape[0], OPD_residual.shape[0]//2) - mask_circle(OPD_residual.shape[0], OPD_residual.shape[0]//2 / 8*1.12)
 
-PSD_turbulent = binning(ComputePSDfromScreens(OPD_turbulent * circ_pupil[...,None]), 2, 'mean')
-PSD_residuals = binning(ComputePSDfromScreens(OPD_residual  * circ_pupil[...,None]), 2, 'mean')
+# PSD_residuals = ComputePSDfromScreens(OPD_residual)
+circ_pupil = mask_circle(OPD_residual.shape[0], OPD_residual.shape[0]//2)# - mask_circle(OPD_residual.shape[0], OPD_residual.shape[0]//2 / 8*1.12)
+
+N_PSD_bin = 2
+# PSD_residuals = ComputePSDfromScreens(binning(OPD_residual  * circ_pupil[...,None], 2, 'mean'))
+# PSD_turbulent = ComputePSDfromScreens(binning(OPD_turbulent * circ_pupil[...,None], 2, 'mean'))
+PSD_residuals = binning(ComputePSDfromScreens(OPD_residual  * circ_pupil[...,None], chunk_size=1000), N_PSD_bin, 'mean')
+PSD_turbulent = binning(ComputePSDfromScreens(OPD_turbulent * circ_pupil[...,None], chunk_size=1000), N_PSD_bin, 'mean')
 
 #%%
 def radial_profile(data, center):
@@ -678,19 +702,18 @@ def radial_profile(data, center):
     radialprofile = tbin / nr
     return radialprofile
 
-N_PSD_bin = 1
 
-PSD_binned_0 = binning(PSD_turbulent, N_PSD_bin, regime='max')
-PSD_binned_1 = binning(PSD_residuals, N_PSD_bin, regime='max')
+PSD_binned_0 = PSD_turbulent
+PSD_binned_1 = PSD_residuals
 
 profi_0 = radial_profile(PSD_binned_0, (PSD_binned_0.shape[0]//2, PSD_binned_0.shape[1]//2))[:PSD_binned_0.shape[1]//2]
 profi_1 = radial_profile(PSD_binned_1, (PSD_binned_1.shape[0]//2, PSD_binned_1.shape[1]//2))[:PSD_binned_1.shape[1]//2]
 
 
 dk = 1.0/8.0 # PSD spatial frequency step [m^-1]
-pitch = 0.2 # [m]
-kc = 1/(2*dm.pitch)
-k = np.arange(PSD_binned_1.shape[0]//2)*dk * N_PSD_bin
+
+kc = 1/(2*(dm.pitch-0.02))
+k = np.arange(PSD_binned_1.shape[0]//2)*dk #* N_PSD_bin
 
 plt.figure(dpi=200)
 plt.plot(k, profi_0, label='Open loop')
@@ -741,16 +764,16 @@ autocorrs = autocorrs[np.argmax(autocorrs) : np.argmax(autocorrs)+20]
 poisson  = lambda x, lmbd, height, b, a: height * lmbd**(x/a) / factorial(x/a) * np.exp(-lmbd) + b
 dt = np.arange(1, len(autocorrs))
 
-try:
-    fit_params, _ = curve_fit(poisson, dt, autocorrs[1:], [4, 5e-9/N_steps, 0, 2])
-    turbulence_var = poisson(0, *fit_params)
-    slopes_var = autocorrs.max() - turbulence_var
+# try:
+    # fit_params, _ = curve_fit(poisson, dt, autocorrs[1:], [4, 5e-9/N_steps, 0, 2])
+    # turbulence_var = poisson(0, *fit_params)
+    # slopes_var = autocorrs.max() - turbulence_var
 
-except RuntimeError:
-    slopes_var = autocorrs.max()
+# except RuntimeError:
+slopes_var = autocorrs.max() - autocorrs.min()
 
-plt.plot(autocorrs)
-plt.plot(poisson(dt, *fit_params))
+# plt.plot(autocorrs)
+# plt.plot(poisson(dt, *fit_params))
 
 # Propagate through the reconstructor matrix to get  the WFS variance
 WFS_var = np.trace(reconstructor @ (np.eye(reconstructor.shape[1])*slopes_var) @ reconstructor.T) / N_modes_propag
@@ -759,7 +782,6 @@ WFS_err = np.sqrt(WFS_var)*1e9 # [nm OPD]
 
 
 #%%
-
 def GetWFSnoiseError(slopes, display=False):
     from scipy.signal   import correlate
     from scipy.optimize import curve_fit
@@ -822,9 +844,8 @@ SR_R = SR_R.mean()
 
 # wfsSignals
 # OPDs
-#
 
-#%%
+#%% 
 rad2mas  = 3600 * 180 * 1000 / np.pi
 rad2arc  = rad2mas / 1000
 
@@ -860,23 +881,19 @@ WFE_std = wvl*np.sqrt(varNoise)/2/np.pi * 1e9
 
 print(WFE_std)
 
-#%%
-
-magnitudes     = np.array([9, 10, 10.5, 10.75])
-autocorr_noise = np.array([38, 63, 99, 128])
-formula_noise  = np.array([25, 45, 58, 64])
-
-plt.plot(magnitudes, autocorr_noise, label='Autocorrelation')
-plt.plot(magnitudes, formula_noise, label='Analytical formula')
-plt.xlabel('R magnitude')
-plt.ylabel('Reconstruction WFE, [nm] RMS')
-plt.legend()
-plt.grid()
 
 
 
 #%%
+TT_modes = KL_dm.reshape([pupil.shape[0], pupil.shape[1], KL_dm.shape[1]])[...,:2]
+TT_coefs = []
+chunck_size = OPD_residual.shape[2] // NDITs
+for i in tqdm(range(NDITs)):
+    chunck = OPD_residual[:,:,i*chunck_size:(i+1)*chunck_size]
+    TT_coefs.append( chunck.reshape(-1, chunck.shape[-1]).T @ TT_modes.reshape(-1, TT_modes.shape[-1]) / tel_vis.pupil.sum() )
+TT_coefs = np.vstack(TT_coefs)
 
+#%%
 data_write = {
     'spectra': {
         'central L': ngs_IR_L.wavelength * 1e9,
@@ -913,6 +930,7 @@ data_write = {
         'Nph vis': n_phs.mean(),
         'rate': param['loopFrequency'],
         'commands': WFS_signals,
+        'tip/tilt residuals': TT_coefs,
         'wavelegnth': ngs_vis.wavelength
     },
 
