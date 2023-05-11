@@ -47,9 +47,10 @@ good_ids = psf_df.index.values.tolist()
 
 #%%
 # id_real = 1209
-# id_real = 576
-# id_real = 719
-id_real = 992
+# id_real = 992
+# id_real = 1476
+id_real = 556
+
 precomputed = False
 
 data_sample = LoadSPHEREsampleByID(id_real)
@@ -91,7 +92,7 @@ param['sizeLenslet']           = config_file['sensor_HO']['SizeLenslets']
 param['readoutNoise']          = config_file['sensor_HO']['SigmaRON']
 param['loopFrequency']         = config_file['RTC']['SensorFrameRate_HO']
 param['gainCL']                = config_file['RTC']['LoopGain_HO']
-param['mechanicalCoupling']    = config_file['DM']['InfCoupling']
+param['mechanicalCoupling']    = config_file['DM']['InfCoupling'] * 2
 param['pitch']                 = config_file['DM']['DmPitchs']
 param['detector gain']         = config_file['sensor_science']['Gain']
 param['DIT']                   = data_sample['Integration']['DIT']
@@ -617,27 +618,6 @@ DITs_R_var = np.stack(DITs_R_var)
 
 
 #%%
-plt.figure()
-crop = 256
-plt.title(N_bin)
-def el_croppo(crop):
-    buf = slice(PSF_long_exposure_L.shape[0]//2-crop//2, PSF_long_exposure_L.shape[1]//2+crop//2)
-    return (buf, buf,...)
-
-test = np.hstack((
-    PSF_long_exposure_L[el_croppo(crop)],
-    PSF_long_exposure_R[el_croppo(crop)],
-    np.abs(PSF_long_exposure_L[el_croppo(crop)] - PSF_long_exposure_R[el_croppo(crop)])
-))
-
-plt.imshow(np.log(test))
-# plt.imshow(test)
-# plt.imshow(np.log(test2))
-# plt.colorbar()
-plt.show()
-
-
-#%%
 # simulation_result = np.save('C:/Users/akuznets/Data/SPHERE/PSF_OOPAO.npy', long_exposure[el_croppo(256)]/long_exposure[el_croppo(256)].sum())
 
 #%%
@@ -683,7 +663,7 @@ def ComputePSDfromScreens(phase_screens, chunk_size=None):
 
 
 # PSD_residuals = ComputePSDfromScreens(OPD_residual)
-circ_pupil = mask_circle(OPD_residual.shape[0], OPD_residual.shape[0]//2)# - mask_circle(OPD_residual.shape[0], OPD_residual.shape[0]//2 / 8*1.12)
+circ_pupil = mask_circle(OPD_residual.shape[0], OPD_residual.shape[0]//2) - mask_circle(OPD_residual.shape[0], OPD_residual.shape[0]//2 / 8*1.12)
 
 N_PSD_bin = 2
 # PSD_residuals = ComputePSDfromScreens(binning(OPD_residual  * circ_pupil[...,None], 2, 'mean'))
