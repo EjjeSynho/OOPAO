@@ -4,6 +4,9 @@ Created on Mon Mar 16 18:33:20 2020
 
 @author: cheritie
 """
+import sys
+sys.path.insert(0, '..')
+sys.path.insert(0, '../..')
 
 import json
 import os
@@ -13,16 +16,54 @@ import jsonpickle
 import numpy as np
 import skimage.transform as sk
 from astropy.io import fits as pfits
+from OOPAO.Source import Photometry
+
+rad2mas  = 3600 * 180 * 1000 / np.pi
+rad2arc  = rad2mas / 1000
+deg2rad  = np.pi / 180
+asec2rad = np.pi / 180 / 3600
+
+seeing = lambda r0, lmbd: rad2arc*0.976*lmbd/r0 # [arcs]
+r0_new = lambda r0, lmbd, lmbd0: r0*(lmbd/lmbd0)**1.2 # [m]
+r0 = lambda seeing, lmbd: rad2arc*0.976*lmbd/seeing # [m]
 
 
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% USEFUL FUNCTIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Returns a gaussian function with the given parameters
+def gaussian(N, height, center_x, center_y, width_x, width_y):
+    gauss_2d = lambda x,y: height*np.exp( -(((center_x-x)/width_x)**2 + ((center_y-y)/width_y)**2)/2 )
+    return gauss_2d(*(np.indices(([N,N])))-(N/2-0.5))
+
+
+def mask_circle(N, r, center=(0,0), centered=True):
+    factor = 0.5 * (1-N%2)
+    if centered:
+        coord_range = np.linspace(-N//2+N%2+factor, N//2-factor, N)
+    else:
+        coord_range = np.linspace(0, N-1, N)
+    xx, yy = np.meshgrid(coord_range-center[1], coord_range-center[0])
+    pupil_round = np.zeros([N, N], dtype=np.int32)
+    pupil_round[np.sqrt(yy**2+xx**2) < r] = 1
+    return pupil_round
+
+
+def magnitudeFromPhotons(tel, photons, band, sampling_time):
+    zero_point = band[2]
+    fluxMap = photons / tel.pupil.sum() * tel.pupil
+    nPhoton = np.nansum(fluxMap / tel.pupilReflectivity) / (np.pi*(tel.D/2)**2) / sampling_time
+    return -2.5 * np.log10(368 * nPhoton / zero_point )
+
+
+def TruePhotonsFromMag(tel, mag, band, sampling_time): # [photons/aperture] !not per m2!
+    c = tel.pupilReflectivity * np.pi*(tel.D/2)**2*sampling_time
+    return Photometry()(band)[2]/368 * 10**(-mag/2.5) * c
+
+
 def print_(input_text,condition):
     if condition:
         print(input_text)
         
 
 def createFolder(path):
-    
     if path.rfind('.') != -1:
         path = path[:path.rfind('/')+1]
         
@@ -30,12 +71,13 @@ def createFolder(path):
         os.makedirs(path)
     except OSError:
         if path:
-            path =path
+            path = path
         else:
             print ("Creation of the directory %s failed:" % path)
             print('Maybe you do not have access to this location.')
     else:
         print ("Successfully created the directory %s !" % path)
+
 
 def emptyClass():
     class nameClass:

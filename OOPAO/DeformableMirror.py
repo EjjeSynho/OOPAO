@@ -37,7 +37,21 @@ from .tools.tools import emptyClass, pol2cart, print_
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% CLASS INITIALIZATION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
 
 class DeformableMirror:
-    def __init__(self,telescope,nSubap,mechCoupling = 0.35, coordinates=0, pitch=None, modes=0, misReg=0, M4_param = [], nJobs = 30, nThreads = 20,print_dm_properties = True,floating_precision = 64, altitude = None ):
+    def __init__(self,
+                 telescope,
+                 nSubap,
+                 mechCoupling = 0.35,
+                 coordinates = 0,
+                 pitch = None,
+                 modes = 0,
+                 misReg = 0,
+                 M4_param = [],
+                 nJobs = 30,
+                 nThreads = 20,
+                 floating_precision = 64,
+                 altitude = None,
+                 display_properties = True):
+        
         """
         ************************** REQUIRED PARAMETERS **************************
         
@@ -154,13 +168,13 @@ class DeformableMirror:
 
                 
         """
-        self.print_dm_properties = print_dm_properties
+        self.print_dm_properties = display_properties
         self.floating_precision = floating_precision
         self.M4_param = M4_param
         
         if M4_param:
             if M4_param['isM4']:
-                print_('Building the set of influence functions of M4...', print_dm_properties)
+                print_('Building the set of influence functions of M4...', display_properties)
                 # generate the M4 influence functions            
 
                 pup = telescope.pupil
@@ -202,10 +216,10 @@ class DeformableMirror:
                 coordinates   = (coordinates/telescope.resolution - 0.5)*40
                 self.M4_param = M4_param
                 self.isM4 = True
-                print_ ('Done!',print_dm_properties)
+                print_ ('Done!',display_properties)
                 b = time.time()
 
-                print_('Done! M4 influence functions computed in ' + str(b-a) + ' s!',print_dm_properties)
+                print_('Done! M4 influence functions computed in ' + str(b-a) + ' s!',display_properties)
             else: self.isM4 = False
         else: self.isM4  = False
 
@@ -247,7 +261,7 @@ class DeformableMirror:
 
         # If no coordinates are given, the DM is in a Cartesian Geometry
         if np.ndim(coordinates) == 0:  
-            print_('No coordinates loaded.. taking the cartesian geometry as a default',print_dm_properties)
+            print_('No coordinates loaded.. taking the cartesian geometry as a default',display_properties)
             self.nAct                               = nSubap+1                            # In that case corresponds to the number of actuator along the diameter            
             self.nActAlongDiameter                  = self.nAct-1
             
@@ -273,7 +287,7 @@ class DeformableMirror:
             if np.shape(coordinates)[1] !=2:
                 raise AttributeError('Wrong size for the DM coordinates, the (x,y) coordinates should be input as a 2D array of dimension [nAct,2]')
                 
-            print_('Coordinates loaded...',print_dm_properties)
+            print_('Coordinates loaded...',display_properties)
 
             self.xIF0 = coordinates[:,0]
             self.yIF0 = coordinates[:,1]
@@ -314,27 +328,30 @@ class DeformableMirror:
         self.coordinates[:,1]   = yIF
  
         if self.isM4==False:
-            print_('Generating a Deformable Mirror: ',print_dm_properties)
+            print_('Generating a Deformable Mirror: ',display_properties)
             if np.ndim(modes)==0:
-                print_('Computing the 2D zonal modes...',print_dm_properties)
+                print_('Computing the 2D zonal modes...',display_properties)
     #                FWHM of the gaussian depends on the anamorphosis
+    
                 def joblib_construction():
-                    Q=Parallel(n_jobs=8,prefer='threads')(delayed(self.modesComputation)(i,j) for i,j in zip(u0x,u0y))
-                    return Q 
+                    Q = Parallel(n_jobs=8, prefer='threads')(delayed(self.modesComputation)(i,j) for i,j in zip(u0x,u0y))
+                    return Q
+                 
                 self.modes=np.squeeze(np.moveaxis(np.asarray(joblib_construction()),0,-1))
                     
             else:
-                print_('Loading the 2D zonal modes...',print_dm_properties)
+                print_('Loading the 2D zonal modes...',display_properties)
                 self.modes = modes
-                print_('Done!',print_dm_properties)
+                print_('Done!',display_properties)
 
         else:
-            print_('Using M4 Influence Functions',print_dm_properties)
+            print_('Using M4 Influence Functions',display_properties)
         if floating_precision==32:            
             self.coefs = np.zeros(self.nValidAct,dtype=np.float32)
         else:
             self.coefs = np.zeros(self.nValidAct,dtype=np.float64)
         self.current_coefs = self.coefs.copy()
+        
         if self.print_dm_properties:
             self.print_properties()
     

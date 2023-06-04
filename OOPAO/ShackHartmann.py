@@ -33,7 +33,16 @@ except:
 
 
 class ShackHartmann:
-    def __init__(self, nSubap, telescope, lightRatio, threshold_cog=0.01, is_geometric=False, binning_factor=1, padding_extension_factor=1, threshold_convolution=0.05):
+    def __init__(self,
+                 nSubap,
+                 telescope,
+                 lightRatio,
+                 threshold_cog = 0.01,
+                 is_geometric = False,
+                 binning_factor = 1,
+                 padding_extension_factor = 1,
+                 threshold_convolution = 0.05,
+                 display_properties = True):
         """
         ************************** REQUIRED PARAMETERS **************************
         
@@ -94,7 +103,7 @@ class ShackHartmann:
         self.threshold_convolution    = threshold_convolution
         self.threshold_cog            = threshold_cog
         self.cog_weight               = 1
-        
+        self.display_properties       = display_properties
 
         # case where the spots are zeropadded to provide larger fOV
         if padding_extension_factor > 2:
@@ -245,19 +254,20 @@ class ShackHartmann:
         self.cam.photonNoise  = readoutNoise
         self.cam.readoutNoise = photonNoise
         self.telescope.resetOPD()
-
-        print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% SHACK HARTMANN WFS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
-        print('{: ^20s}'.format('Subapertures')      + '{: ^18s}'.format(str(self.nSubap)))
-        print('{: ^20s}'.format('Subaperture Size')  + '{: ^18s}'.format(str(np.round(self.telescope.D/self.nSubap,2))) + '{: ^18s}'.format('[m]'   ))
-        print('{: ^20s}'.format('Pixel FoV')         + '{: ^18s}'.format(str(np.round(self.fov_pixel_binned_arcsec,2))) + '{: ^18s}'.format('[arcsec]'))
-        print('{: ^20s}'.format('Subapertue FoV')    + '{: ^18s}'.format(str(np.round(self.fov_lenslet_arcsec,2)))      + '{: ^18s}'.format('[arcsec]'))
-        print('{: ^20s}'.format('Valid Subaperture') + '{: ^18s}'.format(str(str(self.nValidSubaperture))))
         
-        if self.is_LGS:
-            print('{: ^20s}'.format('Spot Elungation')    + '{: ^18s}'.format(str(100*np.round(self.elungation_factor,3)))      +'{: ^18s}'.format('% of a subap' ))
-        
-        print('{: ^20s}'.format('Geometric WFS')    + '{: ^18s}'.format(str(self.is_geometric)))
-        print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
+        if self.display_properties:
+            print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% SHACK HARTMANN WFS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
+            print('{: ^20s}'.format('Subapertures')      + '{: ^18s}'.format(str(self.nSubap)))
+            print('{: ^20s}'.format('Subaperture Size')  + '{: ^18s}'.format(str(np.round(self.telescope.D/self.nSubap,2))) + '{: ^18s}'.format('[m]'   ))
+            print('{: ^20s}'.format('Pixel FoV')         + '{: ^18s}'.format(str(np.round(self.fov_pixel_binned_arcsec,2))) + '{: ^18s}'.format('[arcsec]'))
+            print('{: ^20s}'.format('Subapertue FoV')    + '{: ^18s}'.format(str(np.round(self.fov_lenslet_arcsec,2)))      + '{: ^18s}'.format('[arcsec]'))
+            print('{: ^20s}'.format('Valid Subaperture') + '{: ^18s}'.format(str(str(self.nValidSubaperture))))
+            
+            if self.is_LGS:
+                print('{: ^20s}'.format('Spot Elungation')    + '{: ^18s}'.format(str(100*np.round(self.elungation_factor,3)))      +'{: ^18s}'.format('% of a subap' ))
+            
+            print('{: ^20s}'.format('Geometric WFS')    + '{: ^18s}'.format(str(self.is_geometric)))
+            print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
 
         if self.is_geometric:
             print('WARNING: THE PHOTON AND READOUT NOISE ARE NOT CONSIDERED FOR GEOMETRIC SH-WFS')

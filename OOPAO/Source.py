@@ -86,7 +86,15 @@ class Photometry:
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% SOURCE PHOTOMETRY %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
 class Source:    
-    def __init__(self,optBand,magnitude,coordinates = [0,0],altitude = np.inf, laser_coordinates = [0,0] ,Na_profile = None,FWHM_spot_up = None,display_properties=True):
+    def __init__(self,
+                 optBand,
+                 magnitude,
+                 coordinates = [0,0],
+                 altitude = np.inf,
+                 laser_coordinates = [0,0],
+                 Na_profile = None,
+                 FWHM_spot_up = None,
+                 display_properties = True):
         """
         ************************** REQUIRED PARAMETERS **************************
         
@@ -199,14 +207,14 @@ class Source:
         self._nPhoton  = val
         self.magnitude = -2.5*np.log10(val/self.zeroPoint)
         if self.is_initialized:
-
-            print('NGS flux updated!')
-            print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% SOURCE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
-            print('Wavelength \t'+str(round(self.wavelength*1e6,3)) + ' \t [microns]') 
-            print('Optical Band \t'+str(self.optBand)) 
-            print('Magnitude \t' + str(self.magnitude))
-            print('Flux \t\t'+ str(np.round(self.nPhoton)) + str('\t [photons/m2/s]'))
-            print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
+            if self.display_properties:
+                print('NGS flux updated!')
+                print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% SOURCE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
+                print('Wavelength \t'+str(round(self.wavelength*1e6,3)) + ' \t [microns]') 
+                print('Optical Band \t'+str(self.optBand)) 
+                print('Magnitude \t' + str(self.magnitude))
+                print('Flux \t\t'+ str(np.round(self.nPhoton)) + str('\t [photons/m2/s]'))
+                print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
         
 #    @property
 #    def magnitude(self):

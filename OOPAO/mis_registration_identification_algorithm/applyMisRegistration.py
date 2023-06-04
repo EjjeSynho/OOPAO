@@ -44,7 +44,7 @@ def applyMisRegistration(tel,misRegistration_tmp,param, wfs = None, extra_dm_mis
                                         pitch        = None,\
                                         misReg       = misRegistration_tmp + extra_dm_mis_registration,\
                                         M4_param     = param,\
-                                        print_dm_properties = print_dm_properties,\
+                                        display_properties = print_dm_properties,\
                                         floating_precision =floating_precision)
                     if print_dm_properties:
                         print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
@@ -69,7 +69,7 @@ def applyMisRegistration(tel,misRegistration_tmp,param, wfs = None, extra_dm_mis
                         misReg       = misRegistration_tmp + extra_dm_mis_registration,\
                         modes        = np.reshape(modes,[tel.resolution**2,modes.shape[2]]),\
                         M4_param     = param,\
-                        print_dm_properties = print_dm_properties)
+                        display_properties = print_dm_properties)
                     if print_dm_properties:
                         print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
                         print('Mis-Registrations Applied on user-defined DM!')
@@ -84,7 +84,7 @@ def applyMisRegistration(tel,misRegistration_tmp,param, wfs = None, extra_dm_mis
                         coordinates  = coordinates,\
                         pitch        = pitch,\
                         misReg       = misRegistration_tmp + extra_dm_mis_registration,\
-                        print_dm_properties = print_dm_properties)
+                        display_properties = print_dm_properties)
                 if print_dm_properties:
                     print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
                     print('Mis-Registrations Applied on Synthetic DM!')

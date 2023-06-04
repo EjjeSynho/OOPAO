@@ -4,12 +4,14 @@ Created on Tue Oct 20 13:36:02 2020
 
 @author: cheritie
 """
+import os
 import sys
-sys.path.insert(0, '..')
 
-import numpy as np
-from os import path
-from OOPAO.tools.tools  import createFolder
+script_dir = os.path.dirname(os.path.realpath(__file__))
+sys.path.append( os.path.normpath(os.path.join(script_dir, '..')) )
+
+import json
+from OOPAO.tools.tools import createFolder
 
 
 def initializeParameterFile():
@@ -67,7 +69,7 @@ def initializeParameterFile():
     param['tangentialScaling'   ] = 0                                              # tangential scaling in percentage of diameter
     
     ###%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% WFS PROPERTIES %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    param['modulation'          ] = 3                                              # modulation radius in ratio of wavelength over telescope diameter
+    param['modulation'          ] = 3                                             # modulation radius in ratio of wavelength over telescope diameter
     param['lightThreshold'      ] = 0.5                                            # light threshold to select the valid pixels
     param['unitCalibration'     ] = False                                          # calibration of the PWFS units using a ramp of Tip/Tilt    
     param['is_geometric'        ] = False 
@@ -75,15 +77,21 @@ def initializeParameterFile():
     ###%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% OUTPUT DATA %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     # name of the system
     param['name'] = 'VLT_' +  param['opticalBand science'] +'_band_'+ str(param['nSubaperture'])+'x'+ str(param['nSubaperture'])  
-    
-    ROOT = 'C:/Users/akuznets/Data/SPHERE/simulated/'
-
+       
+    with open(os.path.normpath(os.path.join(script_dir, "../IRDIS_simulation/settings.json")), "r") as f:
+        folder_data = json.load(f)
+   
     # location of the calibration data
-    param['pathInput']  = ROOT + 'data_calibration/' 
+    param['pathCalib']  = folder_data["path_calib"]
+    param['pathInput']  = param['pathCalib']
     # location of the output data
-    param['pathOutput'] = ROOT + 'data_cl/'
+    param['pathOutput'] = folder_data["path_output"]
+    # location of config files for simulations
+    param['pathConfigs'] = folder_data["path_configs"]
+    # location of the overall data folder
+    param['pathData'] = folder_data["path_data"]
     
-    print('Reading/Writting calibration data from ' + param['pathInput'])
+    print('Reading/Writting calibration data from ' + param['pathCalib'])
     print('Writting output data in ' + param['pathOutput'])
 
     createFolder(param['pathOutput'])

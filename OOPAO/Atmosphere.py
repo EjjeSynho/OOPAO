@@ -23,7 +23,18 @@ from .tools.tools import createFolder, emptyClass, globalTransformation, pol2car
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% CLASS INITIALIZATION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 class Atmosphere:
-    def __init__(self,telescope,r0,L0,windSpeed,fractionalR0,windDirection,altitude,mode=2, param = None, asterism = None):
+    def __init__(self,
+                 telescope,
+                 r0,
+                 L0,
+                 windSpeed,
+                 fractionalR0,
+                 windDirection,
+                 altitude,
+                 mode = 2,
+                 param = None,
+                 asterism = None,
+                 display_properties = True):
         """
         An Atmosphere object is made of one or several layer of turbulence that follow the Van Karmann statistics. Each layer is considered to be independant to the other ones and has its own properties (direction, speed, etc.)
         
@@ -108,6 +119,8 @@ class Atmosphere:
         self.seeingArcsec           = 206265*(self.wavelength/self.r0)
         self.asterism               = asterism          # case when multiple sources are considered (LGS and NGS)
         self.param                  = param
+        self.display_properties     = display_properties
+        
         if self.asterism is not None:
             self.oversampling_factor    = np.max((np.asarray(self.asterism.coordinates)[:,0]/(self.telescope.resolution/2)))
         else:
@@ -157,14 +170,14 @@ class Atmosphere:
         self.hasNotBeenInitialized  = False        
         # save the resulting phase screen in OPD  
         self.set_OPD(phase_support)
-        self.print_properties()
-            
-    def buildLayer(self,telescope,r0,L0,i_layer,compute_turbulence = True):
+        
+        if self.display_properties: self.print_properties()
+
+
+    def buildLayer(self, telescope, r0, L0, i_layer, compute_turbulence = True):
         """
             Generation of phase screens using the method introduced in Assemat et al (2006)
         """
-
-    
         # initialize layer object
         layer               = emptyClass()
         # create a random state to allow reproductible sequences of phase screens

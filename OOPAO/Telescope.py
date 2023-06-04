@@ -15,7 +15,16 @@ from .Source import Source
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% CLASS INITIALIZATION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 class Telescope:
     
-    def __init__(self,resolution, diameter,samplingTime=0.001,centralObstruction = 0,fov = 0,pupil=None,pupilReflectivity=1,display_optical_path= False):
+    def __init__(self,
+                 resolution,
+                 diameter,
+                 samplingTime = 0.001,
+                 centralObstruction = 0,
+                 fov = 0,
+                 pupil = None,
+                 pupilReflectivity = 1,
+                 display_optical_path = False,
+                 display_properties = False):
         """
         ************************** REQUIRED PARAMETERS **************************
         
@@ -119,8 +128,9 @@ class Telescope:
             self.pupil  = circle<(D/2)**2 
             self.pupil  = self.pupil*obs
         else:
-            print('User-defined pupil, the central obstruction will not be taken into account...')
-            self.pupil  = pupil        
+            self.pupil  = pupil 
+            if display_properties:
+                print('User-defined pupil, the central obstruction will not be taken into account...')
             
         self.pupilReflectivity           = self.pupil.astype(float)*pupilReflectivity                   # A non uniform reflectivity can be input by the user
         self.pixelArea                   = np.sum(self.pupil)                                           # Total number of pixels in the pupil area
@@ -133,9 +143,11 @@ class Telescope:
         self.isPaired                    = False                                                        # indicate if telescope object is paired with an atmosphere object
         self.spatialFilter               = None
         self.display_optical_path        = display_optical_path
-        self.print_properties()
+        self.isInitialized               = True
+        
+        if display_properties:
+            self.print_properties()
 
-        self.isInitialized= True
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PSF COMPUTATION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
 

@@ -136,7 +136,9 @@ AO_modules/M4_model/*.fits
 OOPAO/M4_model/influence_functions/*.fits
 OOPAO/M4_model/*.fits
 
+
 # json files 
+tutorials/IRDIS_simulation/settings.json
 *.json
 *.fits
 *.filepart
