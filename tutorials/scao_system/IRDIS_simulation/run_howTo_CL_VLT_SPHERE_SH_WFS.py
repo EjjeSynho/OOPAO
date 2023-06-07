@@ -680,7 +680,7 @@ def ComputeLongExposure(OPD_residual, tel, pix_per_l_D):
     del phase_chunk
 
     t_start = time.perf_counter()
-    PSFs_stack = tel.computePSFbatch(EMF_chunk, 256, pix_per_l_D).astype(np.float32)
+    PSFs_stack = tel.computePSFbatch(EMF_chunk, 255, pix_per_l_D).astype(np.float32)
     t_end = time.perf_counter()
     print('Elapsed time:', str(np.round((t_end-t_start)*1e3).astype('int')), 'ms')
     del EMF_chunk

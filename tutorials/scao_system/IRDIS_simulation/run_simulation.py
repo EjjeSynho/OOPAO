@@ -14,7 +14,7 @@ ids = [int(file.split("_")[0].split(".")[0]) for file in files]
 for id in ids:
     try:
         script_path = os.path.normpath(os.path.join(script_dir, "IRDIS_simulation.py"))
-        command = ['python', script_path, str(id)]
+        command = ['/NFS/anaconda/python3.7/bin/python', script_path, str(id)]
         subprocess.run(command)
     except:
         print(f"Error in simulation {id}")

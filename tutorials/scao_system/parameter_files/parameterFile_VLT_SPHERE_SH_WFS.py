@@ -90,6 +90,8 @@ def initializeParameterFile():
     param['pathConfigs'] = folder_data["path_configs"]
     # location of the overall data folder
     param['pathData'] = folder_data["path_data"]
+        
+    param['pathPupils'] = folder_data["path_pupils"]
     
     print('Reading/Writting calibration data from ' + param['pathCalib'])
     print('Writting output data in ' + param['pathOutput'])

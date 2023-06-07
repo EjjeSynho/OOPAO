@@ -111,11 +111,11 @@ def LoadPupilSPHERE():
     return pupil, apodizer
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument('ID', type=int, help='IRDIS sample ID')
-args = parser.parse_args()
-sample_id = args.ID
-# sample_id = 321
+# parser = argparse.ArgumentParser()
+# parser.add_argument('ID', type=int, help='IRDIS sample ID')
+# args = parser.parse_args()
+# sample_id = args.ID
+sample_id = 321
 
 with open(os.path.normpath(os.path.join(script_dir, "settings.json")), "r") as f:
     PATH_CONFIG = json.load(f)["path_configs"]
@@ -158,7 +158,7 @@ tel_vis.apply_spiders(angle, thickness_spider, offset_X = offset_X, offset_Y= of
 vis_band = Photometry()(param['opticalBand WFS'])
 
 flux_per_frame = param['nPhotonPerSubaperture'] * param['validSubap real']
-
+pupil_flux_correction = tel_vis.pupil.size / tel_vis.pupil.sum()
 SAXO_mag = magnitudeFromPhotons(tel_vis, flux_per_frame, vis_band, 1./param['loopFrequency'])
 
 param['magnitude WFS'] = SAXO_mag
@@ -387,7 +387,7 @@ def ComputeLongExposure(OPD_residual, tel, pix_per_l_D):
     EMF_chunk     = np.atleast_3d(amplitude)*np.exp(1j*phase_chunk)
     del phase_chunk
 
-    PSFs_stack = tel.computePSFbatch(EMF_chunk, 256, pix_per_l_D).astype(np.float32)
+    PSFs_stack = tel.computePSFbatch(EMF_chunk, 255, pix_per_l_D).astype(np.float32)
     del EMF_chunk
     long_exposure = PSFs_stack.mean(axis=2)
     variance = PSFs_stack.var(axis=2) #TODO: make noisy
@@ -485,7 +485,6 @@ if compute_PSD:
     profi_0 = radial_profile(PSD_binned_0, (PSD_binned_0.shape[0]//2, PSD_binned_0.shape[1]//2))[:PSD_binned_0.shape[1]//2]
     profi_1 = radial_profile(PSD_binned_1, (PSD_binned_1.shape[0]//2, PSD_binned_1.shape[1]//2))[:PSD_binned_1.shape[1]//2]
 
-
     dk = 1.0/8.0 # PSD spatial frequency step [m^-1]
 
     kc = 1/(2*(dm.pitch-0.02))
@@ -533,7 +532,7 @@ def GetWFSnoiseError(slopes, display=False):
         slopes_var = autocorrs.max()
 
     # Propagate through the reconstructor matrix to get  the WFS variance
-    WFS_var = np.trace(np.dot(reconstructor, np.dot((np.eye(reconstructor.shape[1])*slopes_var), reconstructor.T))) / N_modes_propag  
+    WFS_var = np.trace( np.dot(np.dot(reconstructor, np.eye(reconstructor.shape[1])*slopes_var), reconstructor.T) ) / N_modes_propag
     WFS_err = np.sqrt(WFS_var)*1e9 # [nm OPD]
 
     if display:
@@ -603,21 +602,21 @@ data_write = {
     },
 
     'Strehl (IRDIS)': SR_H,
-    'Strehl (SAXO)': SR_R,
-    'Wind speed': param['windSpeed'],
+    'Strehl (SAXO)':  SR_R,
+    'Wind speed':     param['windSpeed'],
     'Wind direction': param['windDirection'],
 
     'Detector': {
         'psInMas': param['pixel scale'],
-        'ron': param['readoutNoise'],
-        'gain': param['detector gain']
+        'ron':     param['readoutNoise'],
+        'gain':    param['detector gain']
     },
 
     'WFS': {
         'Nph vis': n_phs.mean(),
         'commands': WFS_signals,
         'tip/tilt residuals': TT_coefs,
-        'wavelegnth': ngs_vis.wavelength,
+        'wavelength': ngs_vis.wavelength,
         'Reconst. error': GetWFSnoiseError()
     },
 
@@ -628,8 +627,8 @@ data_write = {
 
     'RTC': {
         'frames delay': param['delay'],
-        'loop rate': param['loopFrequency'],
-        'loop gain' : param['gainCL']
+        'loop rate':    param['loopFrequency'],
+        'loop gain' :   param['gainCL']
     },
     
     'PSF L': DITs_L,
@@ -638,9 +637,10 @@ data_write = {
     'PSF L (variance)': DITs_L_var,
     'PSF R (variance)': DITs_R_var,
 
-    'PSD residuals': PSD_residuals,
+    'PSD residuals':   PSD_residuals,
     'PSD atmospheric': PSD_turbulent
 }
+
 
 # Write to pickle file
 with open(param['pathOutput'] + str(sample_id) + '_synth.pickle', 'wb') as f:

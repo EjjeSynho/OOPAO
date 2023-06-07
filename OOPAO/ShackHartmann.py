@@ -594,7 +594,7 @@ class ShackHartmann:
                 # fill up camera frame if requested (default is False)
                 if self.get_camera_frame_multi is True:
                     self.compute_camera_frame_multi(self.maps_intensity)
-                                    
+
                 # normalization for centroid computation
                 norma = np.sum(np.sum(self.maps_intensity,axis=1),axis=1)
                 # centroid computation
