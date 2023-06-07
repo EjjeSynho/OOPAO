@@ -11,7 +11,6 @@ sys.path.append( os.path.normpath(os.path.join(script_dir, '..')) )
 sys.path.append( os.path.normpath(os.path.join(script_dir, '../..')) )
 sys.path.append( os.path.normpath(os.path.join(script_dir, '../../..')) )
 
-
 import time
 import json
 import numpy as np
@@ -19,6 +18,7 @@ import pickle
 import matplotlib.pyplot as plt
 from skimage.transform import resize
 from astropy.io import fits
+from copy import deepcopy
 
 from tqdm import tqdm
 from pprint import pprint
@@ -66,7 +66,6 @@ psf_df = psf_df[psf_df['invalid'] == False]
 # # psf_df = psf_df[psf_df['Nph WFS'] > 100]
 # good_ids = psf_df.index.values.tolist()
 
-
 #%%
 def GenerateConfig(sample_id):
     data_sample = LoadSPHEREsampleByID(sample_id)
@@ -81,10 +80,18 @@ def GenerateConfig(sample_id):
     config_file['telescope']['PathPupil']     = root + 'data/calibrations/VLT_CALIBRATION/VLT_PUPIL/ALC2LyotStop_measured.fits'
     config_file['telescope']['PathApodizer']  = root + 'data/calibrations/VLT_CALIBRATION/VLT_PUPIL/APO1Apodizer_measured_All.fits'
     config_file['telescope']['PathStatModes'] = root + 'data/calibrations/VLT_CALIBRATION/VLT_STAT/LWEMODES_320.fits'
-    config_file['atmosphere']['Cn2Weights']   = [0.95, 0.05]
-    config_file['atmosphere']['Cn2Heights']   = [0, 10000]
     config_file['sensor_science']['DIT']      = data_sample['Integration']['DIT']
     config_file['sensor_science']['Num. DIT'] = data_sample['Integration']['Num. DITs']
+    
+    if not np.isnan(data_sample['Wind speed']['200 mbar']) and not np.isnan(data_sample['Wind direction']['200 mbar']):
+        config_file['atmosphere']['WindDirection'] = np.append(config_file['atmosphere']['WindDirection'], data_sample['Wind direction']['200 mbar'])
+        config_file['atmosphere']['WindSpeed']     = np.append(config_file['atmosphere']['WindSpeed'],     data_sample['Wind speed']['200 mbar'])
+        config_file['atmosphere']['Cn2Heights']    = [0, 12400]
+        config_file['atmosphere']['Cn2Weights']    = [0.95, 0.05]        
+    else:
+        config_file['atmosphere']['Cn2Heights'] = [0]
+        config_file['atmosphere']['Cn2Weights'] = [1]
+        
     return config_file
 
 
@@ -93,8 +100,8 @@ def GenerateParameterDict(config_file):
     # IR_magnitude = 12.5 # Limiting is J ~ 12.5-13
     # param['magnitude WFS'    ]     = target_magnitude
     # param['magnitude science']     = IR_magnitude
-    param['pupil path']            = config_file['telescope']['PathPupil']
-    param['apodizer path']         = config_file['telescope']['PathApodizer']
+    param['pupil path']            = param['pathPupils'] + os.path.split(config_file['telescope']['PathPupil'])[-1]
+    param['apodizer path']         = param['pathPupils'] + os.path.split(config_file['telescope']['PathApodizer'])[-1]
     param['diameter']              = config_file['telescope']['TelescopeDiameter']
     param['centralObstruction']    = config_file['telescope']['ObscurationRatio']
     param['windDirection']         = config_file['atmosphere']['WindDirection']
@@ -183,6 +190,7 @@ def LoadPupilSPHERE():
 # sample_id = 70
 # sample_id = 331
 sample_id = 1209
+# sample_id = 1452
 # sample_id = 992
 # sample_id = 1476
 # sample_id = 556
@@ -237,8 +245,8 @@ R_mag = mags[bands.index('mag R')]
 # photons = [TruePhotonsFromMag(tel_vis, mag, band[-1], param['samplingTime']) for mag, band in zip(mags, bands)]
 
 vis_band = Photometry()(param['opticalBand WFS'])
-
-flux_per_frame = param['nPhotonPerSubaperture'] * param['validSubap real']
+pupil_flux_correction = tel_vis.pupil.size / tel_vis.pupil.sum()
+flux_per_frame = param['nPhotonPerSubaperture'] * param['validSubap real'] * pupil_flux_correction
 
 SAXO_mag = magnitudeFromPhotons(tel_vis, flux_per_frame, vis_band, 1./param['loopFrequency'])
 
@@ -341,7 +349,6 @@ plt.figure()
 plt.imshow(wfs.cam.frame)
 plt.title('WFS Camera Frame')
 
-
 #%% -----------------------     Modal Basis   ----------------------------------
 # compute the modal basis
 foldername_M2C  = param['pathCalib']  # name of the folder to save the M2C matrix, if None a default name is used 
@@ -378,7 +385,7 @@ plt.title('Basis projected on the DM')
 
 KL_dm = np.reshape(tel_vis.OPD, [tel_vis.resolution**2, tel_vis.OPD.shape[2]])
 
-covMat = (KL_dm.T @ KL_dm) / tel_vis.resolution**2
+covMat = np.dot(KL_dm.T, KL_dm) / tel_vis.resolution**2
 
 plt.figure()
 plt.imshow(covMat)
@@ -390,14 +397,64 @@ plt.plot(np.round(np.std(np.squeeze(KL_dm[tel_vis.pupilLogical,:]),axis = 0),5))
 plt.title('KL mode normalization projected on the DM')
 plt.show()
 
+
 #%% -----------------------     Interaction Matrix   ----------------------------------
 wfs.is_geometric = param['is_geometric']
 
-# controlling 1000 modes
+# controlling desireb number of modes
 M2C_KL = np.asarray(M2C[:,:param['nModes']])
-# Modal interaction matrix
 
-calib_mat_path = param['pathCalib'] + 'calib_KL_' + str(param['nModes']) + '.pickle'
+calib_mat_path = param['pathCalib'] + 'calib_KL_' + str(param['nModes']) + '.fits'
+
+
+def change_key(dictionary, old_key, new_key):
+    """Change a key in a dictionary from old_key to new_key."""
+    dictionary[new_key] = dictionary.pop(old_key)
+    return dictionary
+
+
+def dict_to_fits(data, filename):
+    """Convert a dictionary of numpy arrays to a FITS file."""
+    hdu_list = fits.HDUList()
+
+    for key, np_array in data.items():
+        hdu = fits.ImageHDU(data=np_array, name=key)
+        hdu_list.append(hdu)
+    
+    hdu_list.writeto(filename, overwrite=True)
+    hdu_list.close()
+
+
+def fits_to_dict(filename):
+    """Convert a FITS file back into a dictionary of numpy arrays."""
+    hdu_list = fits.open(filename)
+    data = {hdu.name: hdu.data for hdu in hdu_list if hdu.data is not None}
+    hdu_list.close()
+    return data
+
+
+def convert_keys(data):
+    """Convert specific uppercase keys in a dictionary to lowercase."""
+    key_map = {
+        'S': 's',
+        'S2': 'S',
+        'EIGENVALUES': 'eigenValues',
+        'D': 'D',
+        'U': 'U',
+        'V': 'V',
+        'IS': 'iS',
+        'M': 'M',
+        'ISTRUNC': 'iStrunc',
+        'VTRUNC': 'Vtrunc',
+        'UTRUNC': 'Utrunc',
+        'VTRUNCT': 'VtruncT',
+        'UTRUNCT': 'UtruncT',
+        'MTRUNC': 'Mtrunc',
+        'DTRUNC': 'Dtrunc',
+        'COND': 'cond'
+    }
+    return { key_map.get(k, k): v for k, v in data.items() }
+
 
 if not os.path.exists(calib_mat_path) or not precomputed:
     print('Creating ', calib_mat_path, 'file...')
@@ -412,17 +469,20 @@ if not os.path.exists(calib_mat_path) or not precomputed:
                                  nMeasurements = 200,
                                  noise         = 'off') #'on')
 
-    with open(calib_mat_path, 'wb') as handle:
-        pickle.dump(calib_KL.__dict__, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    temp = deepcopy(calib_KL.__dict__)
+    temp['cond'] = np.array([temp['cond']])
+    temp = change_key(temp, 'S', 'S2')
+    dict_to_fits(temp, calib_mat_path)
+
 else:
     print('Loading ', calib_mat_path, 'file...')
 
     from OOPAO.calibration.CalibrationVault import CalibrationVault
     calib_KL = CalibrationVault(0, invert=False)
 
-    with open(calib_mat_path, 'rb') as handle:
-        calib_KL.__dict__ = pickle.load(handle)
-
+    calib_KL.__dict__ = fits_to_dict(calib_mat_path)
+    calib_KL.__dict__ = convert_keys(calib_KL.__dict__)
+    calib_KL.__dict__['cond'] = calib_KL.__dict__['cond'].item()
 
 plt.figure()
 plt.plot(np.std(calib_KL.D, axis=0))
@@ -473,14 +533,15 @@ LE_PSF_L  = np.log10(tel_vis.PSF_norma_zoom)
 # loop parameters
 gainCL = param['gainCL']
 wfs.cam.readoutNoise = param['readoutNoise']
+wfs.cam.photonNoise  = True
 # wfs.cam.readoutNoise = 0.0
-wfs.cam.photonNoise  = True #False
+# wfs.cam.photonNoise  = False
 
 wfs.cog_weight = np.atleast_3d(gaussian(wfs.n_pix_subap, 1, 0, 0, 4, 4)).transpose([2,0,1]) #TODO: account for the reference slopes
-# wfs.cog_weight = wfs.cog_weight  * 0 + 1
+# wfs.cog_weight = wfs.cog_weight*0 + 1
 wfs.threshold_cog = 3 * wfs.cam.readoutNoise
 
-reconstructor = M2C_CL @ calib_CL.M
+reconstructor = np.dot(M2C_CL, calib_CL.M)
 
 #%%
 %matplotlib qt
@@ -489,8 +550,8 @@ from OOPAO.tools.displayTools import cl_plot
 plt.show()
 
 OPD_residual = []
-n_phs = []
 WFS_signals = []
+n_phs = []
 
 plot_obj = cl_plot(list_fig          = [atm.OPD, tel_vis.mean_removed_OPD, wfs.cam.frame, [dm.coordinates[:,0], np.flip(dm.coordinates[:,1]), dm.coefs], [[0,0],[0,0]], np.log10(tel_vis.PSF_norma_zoom), np.log10(tel_vis.PSF_norma_zoom)],
                    type_fig          = ['imshow','imshow','imshow','scatter','plot','imshow','imshow'],
@@ -499,7 +560,7 @@ plot_obj = cl_plot(list_fig          = [atm.OPD, tel_vis.mean_removed_OPD, wfs.c
                    list_label        = [None,None,None,None,['Time','WFE [nm]'],['Short Exposure PSF',''],['Long Exposure_PSF','']],
                    n_subplot         = [4,2],
                    list_display_axis = [None,None,None,None,True,None,None],
-                   list_ratio        = [[0.95,0.95,0.1], [1,1,1,1]], s=5)
+                   list_ratio        = [[0.95, 0.95, 0.1], [1, 1, 1, 1]], s=5)
 
 # fig = plt.figure(1)
 for i in range(N_loop):
@@ -511,10 +572,11 @@ for i in range(N_loop):
     # save turbulent phase
     turbPhase = tel_vis.src.phase
     # propagate to the WFS with the CL commands applied
-    tel_vis*dm*wfs
-    dm.coefs -= gainCL * (reconstructor @ wfsSignal)
+    tel_vis * dm * wfs
+    if param['delay'] == 0: wfsSignal = wfs.signal
+    dm.coefs -= gainCL * np.dot(reconstructor, wfsSignal)
+    if param['delay'] == 2: wfsSignal = wfs.signal
     # store the slopes after computing the commands => 2 frames delay
-    wfsSignal = wfs.signal
     t_end = time.perf_counter()
     print('Elapseed time:', str(np.round((t_end-t_start)*1e3).astype('int')), 'ms')
 
@@ -536,7 +598,8 @@ for i in range(N_loop):
     
     cl_plot(list_fig = [atm.OPD,
                         tel_vis.mean_removed_OPD,
-                        wfs.cam.frame,dm.coefs,
+                        wfs.cam.frame,
+                        dm.coefs,
                         [np.arange(i+1), residual[:i+1]],
                         np.log10(tel_IR_L.PSF_norma_zoom)[crop,crop],
                         LE_PSF_L],
@@ -552,13 +615,13 @@ for i in range(N_loop):
 
     OPD_residual.append(np.copy(tel_vis.OPD))
     WFS_signals.append(np.copy(wfsSignal))
-    print('Loop '+str(i)+'/'+str(param['nLoop'])+' -- turbulence: '+str(np.round(total[i],1))+', residual: ' +str(np.round(residual[i],1))+ '\n')
+    print('Loop '+str(i)+'/'+str(N_loop)+' -- turbulence: '+str(np.round(total[i],1))+', residual: ' +str(np.round(residual[i],1))+ '\n')
 
 
 #%%
 if force_1sec:
     NDITs = 1
-    N_loop = np.ceil(1.0 / tel_vis.samplingTime).astype('uint') 
+    N_loop = np.ceil(0.1 / tel_vis.samplingTime).astype('uint') 
 else:
     NDITs = param['NDIT']
     N_loop = param['nLoop']
@@ -579,7 +642,7 @@ for i in tqdm(range(N_loop+margin)):
     # propagate to the WFS with the CL commands applied
     tel_vis * dm * wfs
     if param['delay'] < 2:  wfsSignal = wfs.signal # 0 frames delay
-    dm.coefs -= gainCL * (reconstructor @ wfsSignal)
+    dm.coefs -= gainCL * np.dot(reconstructor, wfsSignal)
     if param['delay'] >= 2: wfsSignal = wfs.signal # 2 frames delay
     WFS_signals[:,i]    = np.copy(wfs.signal)
     OPD_residual[:,:,i] = np.copy(tel_vis.OPD_no_pupil)
@@ -771,9 +834,9 @@ slopes_var = autocorrs.max() - autocorrs.min()
 # plt.plot(poisson(dt, *fit_params))
 
 # Propagate through the reconstructor matrix to get  the WFS variance
-WFS_var = np.trace(reconstructor @ (np.eye(reconstructor.shape[1])*slopes_var) @ reconstructor.T) / N_modes_propag
+# WFS_var = np.trace(reconstructor @ (np.eye(reconstructor.shape[1])*slopes_var) @ reconstructor.T) / N_modes_propag
+WFS_var = np.trace( np.dot(np.dot(reconstructor, np.eye(reconstructor.shape[1])*slopes_var), reconstructor.T) ) / N_modes_propag
 WFS_err = np.sqrt(WFS_var)*1e9 # [nm OPD]
-
 
 
 #%%
@@ -804,7 +867,7 @@ def GetWFSnoiseError(slopes, display=False):
         slopes_var = autocorrs.max()
 
     # Propagate through the reconstructor matrix to get  the WFS variance
-    WFS_var = np.trace(reconstructor @ (np.eye(reconstructor.shape[1])*slopes_var) @ reconstructor.T) / N_modes_propag
+    WFS_var = np.trace( np.dot(np.dot(reconstructor, np.eye(reconstructor.shape[1])*slopes_var), reconstructor.T) ) / N_modes_propag
     WFS_err = np.sqrt(WFS_var)*1e9 # [nm OPD]
 
     if display:
@@ -877,7 +940,8 @@ def ComputeJitter():
     chunck_size = OPD_residual.shape[2] // NDITs
     for i in tqdm(range(NDITs)):
         chunck = OPD_residual[:,:,i*chunck_size:(i+1)*chunck_size]
-        TT_coefs.append( chunck.reshape(-1, chunck.shape[-1]).T @ TT_modes.reshape(-1, TT_modes.shape[-1]) / tel_vis.pupil.sum() )
+        # TT_coefs.append( chunck.reshape(-1, chunck.shape[-1]).T @ TT_modes.reshape(-1, TT_modes.shape[-1]) / tel_vis.pupil.sum() )
+        TT_coefs.append( np.dot(chunck.reshape(-1, chunck.shape[-1]).T, TT_modes.reshape(-1, TT_modes.shape[-1])) / tel_vis.pupil.sum() )
     TT_coefs = np.vstack(TT_coefs)
     return TT_coefs
 

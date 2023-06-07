@@ -25,7 +25,7 @@ with open(DATA_PATH+'sphere_df.pickle', 'rb') as handle:
 psf_df = psf_df[psf_df['invalid'] == False]
 # psf_df = psf_df[psf_df['Wind speed (200 mbar)'].notna()]
 # psf_df = psf_df[psf_df['Class A'] == True]
-psf_df = psf_df[psf_df['λ left (nm)'] == 1625] # SELECT ONLY 1625 NM
+psf_df = psf_df[psf_df['λ left (nm)'] == 1625] # Select only 1625 nm
 
 selected_ids = psf_df.index.values.tolist()
 
@@ -43,16 +43,18 @@ def GenerateConfig(sample_id):
     config_file['telescope']['PathPupil']     = root + 'data/calibrations/VLT_CALIBRATION/VLT_PUPIL/ALC2LyotStop_measured.fits'
     config_file['telescope']['PathApodizer']  = root + 'data/calibrations/VLT_CALIBRATION/VLT_PUPIL/APO1Apodizer_measured_All.fits'
     config_file['telescope']['PathStatModes'] = root + 'data/calibrations/VLT_CALIBRATION/VLT_STAT/LWEMODES_320.fits'
-    config_file['atmosphere']['Cn2Weights']   = [0.95, 0.05]
-    config_file['atmosphere']['Cn2Heights']   = [0, 10000]
-    config_file['sensor_science']['DIT'] = data_sample['Integration']['DIT']
+    config_file['sensor_science']['DIT']      = data_sample['Integration']['DIT']
     config_file['sensor_science']['Num. DIT'] = data_sample['Integration']['Num. DITs']
     
-    del config_file['sources_science']['Wavelength']['range L']
-    del config_file['sources_science']['Wavelength']['range R']
-    del config_file['sources_science']['Wavelength']['spectrum L']
-    del config_file['sources_science']['Wavelength']['spectrum R']
-
+    if not np.isnan(data_sample['Wind speed']['200 mbar']) and not np.isnan(data_sample['Wind direction']['200 mbar']):
+        config_file['atmosphere']['WindDirection'] = np.append(config_file['atmosphere']['WindDirection'], data_sample['Wind direction']['200 mbar'])
+        config_file['atmosphere']['WindSpeed']     = np.append(config_file['atmosphere']['WindSpeed'],     data_sample['Wind speed']['200 mbar'])
+        config_file['atmosphere']['Cn2Heights']    = [0, 12400]
+        config_file['atmosphere']['Cn2Weights']    = [0.95, 0.05]        
+    else:
+        config_file['atmosphere']['Cn2Heights'] = [0]
+        config_file['atmosphere']['Cn2Weights'] = [1]
+        
     return config_file
 
 

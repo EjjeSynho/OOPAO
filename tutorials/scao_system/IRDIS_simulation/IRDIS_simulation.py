@@ -40,8 +40,11 @@ def GenerateParameterDict(config_file):
     # IR_magnitude = 12.5 # Limiting is J ~ 12.5-13
     # param['magnitude WFS'    ]     = target_magnitude
     # param['magnitude science']     = IR_magnitude
-    param['pupil path']            = config_file['telescope']['PathPupil']
-    param['apodizer path']         = config_file['telescope']['PathApodizer']
+    # param['pupil path']            = config_file['telescope']['PathPupil']
+    # param['apodizer path']         = config_file['telescope']['PathApodizer']
+    
+    param['pupil path']            = param['pathPupils'] + os.path.split(config_file['telescope']['PathPupil'])[-1]
+    param['apodizer path']         = param['pathPupils'] + os.path.split(config_file['telescope']['PathApodizer'])[-1]
     param['diameter']              = config_file['telescope']['TelescopeDiameter']
     param['centralObstruction']    = config_file['telescope']['ObscurationRatio']
     param['windDirection']         = config_file['atmosphere']['WindDirection']
@@ -210,7 +213,7 @@ dm = DeformableMirror(telescope    = tel_vis,
 
 #%% -----------------------     SH WFS   ----------------------------------
 # make sure tel and atm are separated to initialize the PWFS
-tel_vis-atm
+tel_vis - atm
 wfs = ShackHartmann(nSubap       = param['nSubaperture'],
                     telescope    = tel_vis,
                     lightRatio   = param['lightThreshold'],
@@ -248,18 +251,48 @@ dm.coefs = M2C[:,:50]
 
 tel_vis * dm
 KL_dm = np.reshape(tel_vis.OPD, [tel_vis.resolution**2, tel_vis.OPD.shape[2]])
-covMat = (KL_dm.T @ KL_dm) / tel_vis.resolution**2
+covMat = np.dot(KL_dm.T, KL_dm) / tel_vis.resolution**2
 
 #%% -----------------------     Interaction Matrix   ----------------------------------
 wfs.is_geometric = param['is_geometric']
 # controlling 1000 modes
 M2C_KL = np.asarray(M2C[:,:param['nModes']])
 # Modal interaction matrix
-calib_mat_path = param['pathCalib'] + 'calib_KL_' + str(param['nModes']) + '.pickle'
-calib_KL = CalibrationVault(0, invert=False)
+calib_mat_path = param['pathCalib'] + 'calib_KL_' + str(param['nModes']) + '.fits'
 
-with open(calib_mat_path, 'rb') as handle:
-    calib_KL.__dict__ = pickle.load(handle)
+def fits_to_dict(filename):
+    """Convert a FITS file back into a dictionary of numpy arrays."""
+    hdu_list = fits.open(filename)
+    data = {hdu.name: hdu.data for hdu in hdu_list if hdu.data is not None}
+    hdu_list.close()
+    return data
+
+def convert_keys(data):
+    """Convert specific uppercase keys in a dictionary to lowercase."""
+    key_map = {
+        'S': 's',
+        'S2': 'S',
+        'EIGENVALUES': 'eigenValues',
+        'D': 'D',
+        'U': 'U',
+        'V': 'V',
+        'IS': 'iS',
+        'M': 'M',
+        'ISTRUNC': 'iStrunc',
+        'VTRUNC': 'Vtrunc',
+        'UTRUNC': 'Utrunc',
+        'VTRUNCT': 'VtruncT',
+        'UTRUNCT': 'UtruncT',
+        'MTRUNC': 'Mtrunc',
+        'DTRUNC': 'Dtrunc',
+        'COND': 'cond'
+    }
+    return { key_map.get(k, k): v for k, v in data.items() }
+
+calib_KL = CalibrationVault(0, invert=False)
+calib_KL.__dict__ = fits_to_dict(calib_mat_path)
+calib_KL.__dict__ = convert_keys(calib_KL.__dict__)
+calib_KL.__dict__['cond'] = calib_KL.__dict__['cond'].item()
 
 #%%
 # These are the calibration data used to close the loop
@@ -294,24 +327,24 @@ wfs.cam.photonNoise  = True #False
 wfs.cog_weight = np.atleast_3d(gaussian(wfs.n_pix_subap, 1, 0, 0, 4, 4)).transpose([2,0,1]) #TODO: account for the reference slopes
 wfs.threshold_cog = 3 * wfs.cam.readoutNoise
 
-reconstructor = M2C_CL @ calib_CL.M
+reconstructor = np.dot(M2C_CL, calib_CL.M)
 
 #%%
 if force_1sec:
     NDITs = 1
-    N_loop = np.ceil(0.1 / tel_vis.samplingTime).astype('uint') 
+    N_loop = np.ceil(1.0 / tel_vis.samplingTime).astype('uint') 
 else:
-    NDITs = param['NDIT']
+    NDITs  = param['NDIT']
     N_loop = param['nLoop']
 
 margin = 10 # First 10 frames are not recorded (while the loop is in the process of closing)
 
-OPD_turbulent = np.zeros([tel_vis.pupil.shape[0], tel_vis.pupil.shape[1], N_loop+margin], dtype=np.float32)
-OPD_residual  = np.zeros([tel_vis.pupil.shape[0], tel_vis.pupil.shape[1], N_loop+margin], dtype=np.float32)
-WFS_signals   = np.zeros([wfs.signal.shape[0], N_loop + margin], dtype=np.float32)
-n_phs         = np.zeros([N_loop + margin], dtype=np.float32)
+OPD_turbulent = np.zeros([tel_vis.pupil.shape[0], tel_vis.pupil.shape[1], int(N_loop+margin)], dtype=np.float32)
+OPD_residual  = np.zeros([tel_vis.pupil.shape[0], tel_vis.pupil.shape[1], int(N_loop+margin)], dtype=np.float32)
+WFS_signals   = np.zeros([wfs.signal.shape[0], int(N_loop + margin)], dtype=np.float32)
+n_phs         = np.zeros([int(N_loop + margin)], dtype=np.float32)
 
-for i in range(N_loop + margin):
+for i in range(int(N_loop + margin)):
     # update phase screens => overwrite tel.OPD and consequently tel.src.phase
     atm.update()
     # save turbulent phase
@@ -319,7 +352,7 @@ for i in range(N_loop + margin):
     # propagate to the WFS with the CL commands applied
     tel_vis * dm * wfs
     if param['delay'] < 2:  wfsSignal = wfs.signal # 0 frames delay
-    dm.coefs -= gainCL * (reconstructor @ wfsSignal)
+    dm.coefs -= gainCL * np.dot(reconstructor, wfsSignal)
     if param['delay'] >= 2: wfsSignal = wfs.signal # 2 frames delay
     WFS_signals[:,i]    = np.copy(wfs.signal)
     OPD_residual[:,:,i] = np.copy(tel_vis.OPD_no_pupil)
@@ -500,7 +533,7 @@ def GetWFSnoiseError(slopes, display=False):
         slopes_var = autocorrs.max()
 
     # Propagate through the reconstructor matrix to get  the WFS variance
-    WFS_var = np.trace(reconstructor @ (np.eye(reconstructor.shape[1])*slopes_var) @ reconstructor.T) / N_modes_propag
+    WFS_var = np.trace(np.dot(reconstructor, np.dot((np.eye(reconstructor.shape[1])*slopes_var), reconstructor.T))) / N_modes_propag  
     WFS_err = np.sqrt(WFS_var)*1e9 # [nm OPD]
 
     if display:
@@ -537,7 +570,7 @@ def ComputeJitter():
     chunck_size = OPD_residual.shape[2] // NDITs
     for i in range(NDITs):
         chunck = OPD_residual[:,:,i*chunck_size:(i+1)*chunck_size]
-        TT_coefs.append( chunck.reshape(-1, chunck.shape[-1]).T @ TT_modes.reshape(-1, TT_modes.shape[-1]) / tel_vis.pupil.sum() )
+        TT_coefs.append( np.dot(chunck.reshape(-1, chunck.shape[-1]).T, TT_modes.reshape(-1, TT_modes.shape[-1])) / tel_vis.pupil.sum() )
     TT_coefs = np.vstack(TT_coefs)
     return TT_coefs
 
@@ -585,7 +618,7 @@ data_write = {
         'commands': WFS_signals,
         'tip/tilt residuals': TT_coefs,
         'wavelegnth': ngs_vis.wavelength,
-        'Reconst. error': GetWFSnoiseError(WFS_signals)
+        'Reconst. error': GetWFSnoiseError()
     },
 
     'telescope': {
@@ -612,3 +645,5 @@ data_write = {
 # Write to pickle file
 with open(param['pathOutput'] + str(sample_id) + '_synth.pickle', 'wb') as f:
     pickle.dump(data_write, f)
+
+# %%
