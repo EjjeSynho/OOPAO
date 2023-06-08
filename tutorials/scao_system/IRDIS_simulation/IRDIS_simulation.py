@@ -332,7 +332,7 @@ reconstructor = np.dot(M2C_CL, calib_CL.M)
 #%%
 if force_1sec:
     NDITs = 1
-    N_loop = np.ceil(1.0 / tel_vis.samplingTime).astype('uint') 
+    N_loop = np.ceil(0.1 / tel_vis.samplingTime).astype('uint') 
 else:
     NDITs  = param['NDIT']
     N_loop = param['nLoop']
@@ -422,6 +422,10 @@ if generate_right:
     DITs_R = np.stack(DITs_R)
     DITs_R_var = np.stack(DITs_R_var)
 
+
+#%%
+
+plt.imshow(np.log10(PSF_LE_L))
 
 #%%
 def ComputePSDfromScreens(phase_screens, chunk_size=None):
@@ -617,7 +621,7 @@ data_write = {
         'commands': WFS_signals,
         'tip/tilt residuals': TT_coefs,
         'wavelength': ngs_vis.wavelength,
-        'Reconst. error': GetWFSnoiseError()
+        'Reconst. error': GetWFSnoiseError(WFS_signals)
     },
 
     'telescope': {

@@ -9,7 +9,7 @@ import json
 import random
 import time
 
-import jsonpickle
+# import jsonpickle
 import numpy as np
 import scipy as sp
 from numpy.random import RandomState
@@ -95,12 +95,12 @@ def makeCovarianceMatrix(rho1,rho2,atm):
             try:
                 with open(location_data+name_data ) as f:
                     C = json.load(f)
-                data_loaded = jsonpickle.decode(C)               
+                # data_loaded = jsonpickle.decode(C)               
             except:
                 createFolder(location_data)
                 with open(location_data+name_data ) as f:
                     C = json.load(f)
-                data_loaded = jsonpickle.decode(C)  
+                # data_loaded = jsonpickle.decode(C)  
                 
             sp_kv = data_loaded['sp_kv']
            

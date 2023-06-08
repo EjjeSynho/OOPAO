@@ -9,7 +9,7 @@ import inspect
 import json
 import time
 
-import jsonpickle
+# import jsonpickle
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy.random import RandomState
@@ -439,12 +439,12 @@ class Atmosphere:
                     try:
                         with open(location_data+name_data ) as f:
                             C = json.load(f)
-                        data_loaded = jsonpickle.decode(C)               
+                        # data_loaded = jsonpickle.decode(C)               
                     except:
                         createFolder(location_data)
                         with open(location_data+name_data ) as f:
                             C = json.load(f)
-                        data_loaded = jsonpickle.decode(C)                    
+                        # data_loaded = jsonpickle.decode(C)                    
                     self.ZZt_inv = data_loaded['ZZt_inv']
                     
                 except: 
@@ -460,7 +460,7 @@ class Atmosphere:
                     data['pupil'] = self.telescope.pupil
                     data['ZZt_inv'] = self.ZZt_inv
                             
-                    data_encoded  = jsonpickle.encode(data)
+                    # data_encoded  = jsonpickle.encode(data)
                     with open(location_data+name_data, 'w') as f:
                         json.dump(data_encoded, f)
             d=time.time()

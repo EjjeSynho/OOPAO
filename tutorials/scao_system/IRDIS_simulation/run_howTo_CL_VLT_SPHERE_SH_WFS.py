@@ -989,7 +989,7 @@ data_write = {
         'commands': WFS_signals,
         'tip/tilt residuals': TT_coefs,
         'wavelegnth': ngs_vis.wavelength,
-        'Reconst. error': GetWFSnoiseError()
+        'Reconst. error': GetWFSnoiseError(WFS_signals)
     },
 
     'telescope': {

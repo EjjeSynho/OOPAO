@@ -12,7 +12,7 @@ import json
 import os
 import subprocess
 
-import jsonpickle
+# import jsonpickle
 import numpy as np
 import skimage.transform as sk
 from astropy.io import fits as pfits
@@ -134,7 +134,7 @@ def read_json(filename):
     with open(filename ) as f:
         C = json.load(f)
     
-    data = jsonpickle.decode(C) 
+    # data = jsonpickle.decode(C) 
 
     return data
 
