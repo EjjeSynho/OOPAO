@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import numexpr as ne
 import numpy as np
 import psutil
-import pyfftw
+# import pyfftw
 
 
 def sizeof_fmt(num, suffix='B'):
@@ -26,8 +26,6 @@ def sizeof_fmt(num, suffix='B'):
             return "%3.1f %s%s" % (num, unit, suffix)
         num /= 1024.0
     return "%.1f %s%s" % (num, 'Yi', suffix)
-
-
 
 
 def run(file2exec):

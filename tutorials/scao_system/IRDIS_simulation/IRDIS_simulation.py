@@ -1,7 +1,12 @@
 #%%
+# %reload_ext autoreload
+# %autoreload 2
+import warnings
 import argparse
 import os
 import sys
+
+warnings.simplefilter(action='once', category=Warning)
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.append( os.path.normpath(os.path.join(script_dir, '..')) )
@@ -111,11 +116,11 @@ def LoadPupilSPHERE():
     return pupil, apodizer
 
 
-# parser = argparse.ArgumentParser()
-# parser.add_argument('ID', type=int, help='IRDIS sample ID')
-# args = parser.parse_args()
-# sample_id = args.ID
-sample_id = 321
+parser = argparse.ArgumentParser()
+parser.add_argument('ID', type=int, help='IRDIS sample ID')
+args = parser.parse_args()
+sample_id = args.ID
+# sample_id = 1216
 
 with open(os.path.normpath(os.path.join(script_dir, "settings.json")), "r") as f:
     PATH_CONFIG = json.load(f)["path_configs"]
@@ -224,11 +229,11 @@ tel_vis * wfs
 #%% -----------------------     Modal Basis   ----------------------------------
 # KL Modal basis
 foldername_M2C  = param['pathCalib']  # name of the folder to save the M2C matrix, if None a default name is used 
-filename_M2C    = 'M2C_basis_' + str(tel_vis.resolution) + '_res.fits'
+filename_M2C    = 'M2C_basis_' + str(tel_vis.resolution) + '_res'
 
-if os.path.exists(foldername_M2C + filename_M2C):
+if os.path.exists(foldername_M2C + filename_M2C + '.fits'	):
     # read fits file
-    M2C = fits.getdata(foldername_M2C + filename_M2C)
+    M2C = fits.getdata(foldername_M2C + filename_M2C + '.fits')
 else:
     # compute M2C
     M2C = compute_M2C(telescope        = tel_vis, #M2C in theory for each r0, but who cares
@@ -332,7 +337,9 @@ reconstructor = np.dot(M2C_CL, calib_CL.M)
 #%%
 if force_1sec:
     NDITs = 1
-    N_loop = np.ceil(0.1 / tel_vis.samplingTime).astype('uint') 
+    param['DIT'] = 1.0
+    param['NDIT'] = 1
+    N_loop = np.ceil(1.0 / tel_vis.samplingTime).astype('uint') 
 else:
     NDITs  = param['NDIT']
     N_loop = param['nLoop']
@@ -358,6 +365,8 @@ for i in range(int(N_loop + margin)):
     OPD_residual[:,:,i] = np.copy(tel_vis.OPD_no_pupil)
     n_phs[i] = np.median(wfs.photon_per_subaperture_2D[(wfs.validLenslets_x, wfs.validLenslets_y)])
     #print('Loop '+str(i)+'/'+str(param['nLoop'])+' -- turbulence: '+str(np.round(total[i],1))+', residual: ' +str(np.round(residual[i],1))+ '\n')
+    print('Step {0:d}/{1:d}, res.: {2:.1f} [nm]'.format(i+1, int(N_loop+margin), np.std(OPD_residual[:,:,i])*1e9), end='\r')
+
 
 OPD_turbulent = OPD_turbulent[...,margin:]
 WFS_signals   = WFS_signals[...,margin:]
@@ -422,10 +431,6 @@ if generate_right:
     DITs_R = np.stack(DITs_R)
     DITs_R_var = np.stack(DITs_R_var)
 
-
-#%%
-
-plt.imshow(np.log10(PSF_LE_L))
 
 #%%
 def ComputePSDfromScreens(phase_screens, chunk_size=None):

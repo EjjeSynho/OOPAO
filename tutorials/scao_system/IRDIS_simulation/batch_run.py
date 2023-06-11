@@ -1,56 +1,53 @@
 #%%
-import concurrent.futures
+import numpy as np
+import subprocess
 import pexpect
 import json
 import os
-import numpy as np
 
-script_dir = os.path.dirname(os.path.realpath(__file__))
+# Directory containing sample files
 
-with open(os.path.normpath(os.path.join(script_dir, "settings.json")), "r") as f:
-    f_data = json.load(f)
-    PATH_CONFIG = f_data["path_configs"]
-    hosts = f_data['machines'].split(', ')
+current_dir = os.path.dirname(os.path.realpath(__file__))
 
-files = os.listdir(PATH_CONFIG)
-# Splitting the IDs across the machines
-ids = [int(file.split("_")[0].split(".")[0]) for file in files]
+with open(os.path.normpath(os.path.join(current_dir, "settings.json")), "r") as f:
+    folder_data = json.load(f)
 
-command_base = '/NFS/anaconda/python3.7/bin/python' + ' ' + script_dir + '/run_simulation.py' + ' '
-ids = np.array_split(ids, len(hosts))
+py_dir     = '/NFS/anaconda/python3.7/bin/python'
+user       = folder_data["user"]
+password   = folder_data["password"]
+directory  = folder_data["path_configs"]
+machines   = folder_data["machines"].split(", ")
+run_script = folder_data["path_output"] + "run_simulation.py"
 
-gen_id_str = lambda x: ' '.join([str(i) for i in x])
+sessions_per_machine = 3
 
-commands = []
-for i in range(len(hosts)):
-    command = command_base + gen_id_str(ids[i].tolist())
-    commands.append(command)
+# Get the files for processing
+files = sorted([int(f.split('.')[0]) for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))])
 
-def ssh_command(user, host, password, command):
-    child = pexpect.spawn('ssh %s@%s %s' % (user, host, command))
-    child.expect([pexpect.TIMEOUT, '[P|p]assword:'])
-    child.sendline(password)
-    child.expect(pexpect.EOF)  # Wait for the end of the command output
-    return child.before  # This contains the output of your command
+total_samples = len(files)
 
-# Example usage
-user = 'akuznets'
-password = '123QwE!@#'
+file_args = [' '.join(map(str, a.tolist())) for a in np.array_split(files, len(machines)*sessions_per_machine)]
 
-# host = 'mcao153'
-# command = 'hostnamectl'
-# result = ssh_command(user, host, password, command)
-# print(result)
 
 #%%
-with concurrent.futures.ThreadPoolExecutor() as executor:
-    futures = {executor.submit(ssh_command, user, host, password, command): host for host, command in zip(hosts, commands)}
+c = 0
+commands = []
 
-for future in concurrent.futures.as_completed(futures):
-    host = futures[future]
-    try:
-        data = future.result()
-    except Exception as exc:
-        print('%r generated an exception: %s' % (host, exc))
-    else:
-        print('Host %r has data: \n%s' % (host, data))
+for machine in machines:
+    print(f"Connecting to {machine}...")
+    for session_num in range(1, sessions_per_machine + 1):
+        session_name = f"{machine}_{session_num}"
+        print(f"Running session {session_name}...")
+
+        subprocess.Popen(["tmux", "new-session", "-d", "-s", session_name])
+        
+        ssh_command = f"ssh {user}@{machine} {py_dir} {run_script} {file_args[c]}"
+        c += 1
+        child = pexpect.spawn(f"tmux send-keys -t {session_name} \"{ssh_command}; exit\" Enter", timeout=30)
+        child.expect_exact("password:")
+        child.sendline(password)
+
+        print(f"Created session {session_name}")
+
+    print(f"Disconnected from {machine}")
+# %%
